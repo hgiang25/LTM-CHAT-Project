@@ -1,0 +1,11 @@
+# .gitignore
+.env
+firebase-service-account.json
+bin/
+obj/
+*.user
+*.suo
+aws-credentials.json
+.vs/
+packages/
+.vscode/
