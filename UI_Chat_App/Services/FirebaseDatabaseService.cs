@@ -10,6 +10,7 @@ using Google.Cloud.Firestore;
 using Google.Cloud.Firestore.V1;
 using UI_Chat_App;
 using Google.Apis.Auth.OAuth2;
+using System.Windows.Forms;
 
 namespace ChatApp.Services
 {
@@ -96,6 +97,9 @@ namespace ChatApp.Services
                 throw new Exception("Failed to save message to Firestore: " + ex.Message, ex);
             }
         }
+
+        
+
 
         public async Task<List<MessageData>> GetMessagesAsync(string chatRoomId)
         {
@@ -485,8 +489,102 @@ namespace ChatApp.Services
             }
         }
 
+        public async Task<List<NotificationData>> GetNotificationsAsync(string userId)
+        {
+            try
+            {
+                CollectionReference notifRef = _firestoreDb
+                    .Collection("notifications")
+                    .Document(userId)
+                    .Collection("items");
 
-        
+                QuerySnapshot snapshot = await notifRef
+                    .OrderBy("Timestamp")
+                    .GetSnapshotAsync();
+
+                var notifications = snapshot.Documents
+                    .Select(doc =>
+                    {
+                        var notification = doc.ConvertTo<NotificationData>();
+                        notification.Id = doc.Id;
+                        return notification;
+                    })                    
+                    .ToList();
+
+                Console.WriteLine($"Loaded {notifications.Count} notifications for user {userId}");
+                return notifications;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to get notifications for user {userId}: {ex.Message}", ex);
+            }
+        }
+        public async Task SendNotificationAsync(string receiverId, string senderId, string content)
+        {
+            var notification = new NotificationData
+            {
+                Type = "New Notification",
+                From = senderId,
+                To = receiverId,
+                Content = content,
+                Timestamp = DateTime.UtcNow.ToString("o"),
+                IsRead = false
+            };
+
+            DocumentReference docRef = _firestoreDb
+                .Collection("notifications")
+                .Document(receiverId)
+                .Collection("items")
+                .Document(); // tạo document ID tự động
+
+            await docRef.SetAsync(notification);
+        }
+
+        public async Task MarkNotificationsAsReadAsync(string currUserId, string notificationId)
+        {
+            DocumentReference notificationRef = _firestoreDb
+                .Collection("notifications")
+                .Document(currUserId)
+                .Collection("items")
+                .Document(notificationId);
+            DocumentSnapshot snapshot = await notificationRef.GetSnapshotAsync();
+            if (!snapshot.Exists)
+            {
+                throw new Exception($"Notification with ID {notificationId} not found in user notice {currUserId}");
+            }
+            await notificationRef.UpdateAsync("IsRead", true);
+            Console.WriteLine($"Marked notification {notificationId} as seen in notification room {currUserId}");                        
+        }
+        public async Task<int> CountUnreadNotificationsAsync(string userId)
+        {
+            Console.WriteLine($"[DEBUG] CountUnreadNotificationsAsync called for userId: {userId}");
+            try
+            {
+                if (string.IsNullOrEmpty(userId))
+                    throw new ArgumentException("UserId cannot be empty.");
+
+                CollectionReference notifRef = _firestoreDb
+                    .Collection("notifications")
+                    .Document(userId)
+                    .Collection("items");
+
+                // Lấy tất cả thông báo
+                QuerySnapshot snapshot = await notifRef.GetSnapshotAsync();
+
+                // Lọc các thông báo chưa đọc tại client
+                int unreadCount = snapshot.Documents
+                    .Select(doc => doc.ConvertTo<NotificationData>())
+                    .Count(n => n.IsRead == false);
+
+                Console.WriteLine($"Found {unreadCount} unread notifications for user {userId}");
+                return unreadCount;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to count unread notifications for user {userId}: {ex.Message}");
+                throw new Exception($"Failed to count unread notifications: {ex.Message}", ex);
+            }
+        }
 
     }
 }

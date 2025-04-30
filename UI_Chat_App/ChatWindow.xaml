@@ -205,9 +205,31 @@
                         <Button Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Margin="0,0,5,0" Click="SearchButtonListUser_Click" Style="{StaticResource WindowButtonStyle}">
                             <Image Source="Icons/search.png" Width="20" Height="20"/>
                         </Button>
-                        <Button Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="NotificationButton_Click" Style="{StaticResource WindowButtonStyle}">
-                            <Image Source="Icons/notification.png" Width="20" Height="20"/>
+                        <Button Width="30" Height="30"
+        Background="Transparent"
+        BorderBrush="Transparent"
+        Click="NotificationButton_Click"
+        Style="{StaticResource WindowButtonStyle}">
+                            <Grid>
+                                <Image Source="Icons/notification.png" Width="20" Height="20"/>
+
+                                <TextBlock x:Name="NotificationCountText"
+                   Text="0"
+                   FontSize="10"
+                   FontWeight="Bold"
+                   Foreground="Red"
+                   Background="White"
+                   TextAlignment="Center"
+                   VerticalAlignment="Top"
+                   HorizontalAlignment="Right"
+                   Margin="0,0,0,0"
+                   Visibility="Collapsed"
+                   Width="14" Height="14"
+                   Padding="0"
+                   ClipToBounds="True"/>
+                            </Grid>
                         </Button>
+
                         <Button Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="MoreOptionsButton_Click" Style="{StaticResource WindowButtonStyle}">
                             <Image Source="Icons/more_options.png" Width="20" Height="20"/>
                         </Button>
