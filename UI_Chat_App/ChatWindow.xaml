@@ -3,12 +3,13 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:UI_Chat_App"
         xmlns:converters="clr-namespace:UI_Chat_App.Converters" 
+        xmlns:local="clr-namespace:UI_Chat_App"   
         mc:Ignorable="d"
-        Title="ChatWindow" Height="500" Width="900" WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        Title="ChatWindow" Height="500" Width="1000" WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         WindowStartupLocation="CenterScreen" MouseLeftButtonDown="Window_MouseLeftButtonDown">
     <Window.Resources>
+        
         <!-- Thêm ImageUrlConverter vào Resources -->
         <converters:ImageUrlConverter x:Key="ImageUrlConverter"/>
 
@@ -110,15 +111,16 @@
             </Setter>
         </Style>
         <!-- Style cho tin nhắn căn phải -->
-        <Style x:Key="RightAlignedMessageStyle" TargetType="TextBlock">
+        <Style x:Key="RightAlignedMessageStyle" TargetType="TextBlock" >
             <Setter Property="FontSize" Value="16"/>
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="Aqua"/>
+            <Setter Property="Background" Value="Black"/>
             <Setter Property="Margin" Value="5,5,5,0"/>
             <Setter Property="Padding" Value="10"/>
             <Setter Property="TextAlignment" Value="Right"/>
             <Setter Property="HorizontalAlignment" Value="Right"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
+            
         </Style>
         <!-- Style cho ListBox bo tròn -->
         <Style x:Key="RoundedListBoxStyle" TargetType="ListBox">
@@ -141,35 +143,142 @@
         </Style>
         <!-- DataTemplate cho danh sách bạn bè -->
         <DataTemplate x:Key="UserBoxTemplate">
-            <Border Background="WhiteSmoke" BorderBrush="Transparent" BorderThickness="0" CornerRadius="10" Padding="10" Margin="5" Width="200">
+            <Border Background="White" 
+            BorderBrush="#E0E0E0" 
+            BorderThickness="1" 
+            CornerRadius="12" 
+            Padding="10" 
+            Margin="5"
+            SnapsToDevicePixels="True">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="10" ShadowDepth="2" Color="Gray" Opacity="0.2"/>
+                </Border.Effect>
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="50"/>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="50"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <Image Source="{Binding Avatar, Converter={StaticResource ImageUrlConverter}, FallbackValue='Icons/user.png'}" 
-                           Width="40" Height="40" Margin="0,0,10,0" Grid.Column="0"/>
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding DisplayName}" FontSize="16" FontWeight="Bold" Foreground="Black"/>
+
+                    <!-- Avatar -->
+                    <Border Width="50" Height="50" CornerRadius="25" ClipToBounds="True" Grid.Column="0">
+                        <Image Source="{Binding Avatar, Converter={StaticResource ImageUrlConverter}, FallbackValue='Icons/user.png'}" 
+                       Width="50" Height="50"
+                       Stretch="UniformToFill"/>
+                    </Border>
+
+                    <!-- User Info -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0">
+                        <TextBlock Text="{Binding DisplayName}" 
+                           FontSize="16" 
+                           FontWeight="SemiBold" 
+                           Foreground="#333333"/>
                         <TextBlock Text="{Binding IsOnline, Converter={StaticResource BooleanToOnlineStatusConverter}}" 
-                                   FontSize="12" Foreground="{Binding IsOnline, Converter={StaticResource BooleanToColorConverter}}"/>
+                           FontSize="12" 
+                           Foreground="{Binding IsOnline, Converter={StaticResource BooleanToColorConverter}}" 
+                           Margin="0,3,0,0"/>
                     </StackPanel>
-                    <Button Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="DeleteUserButton_Click" Style="{StaticResource WindowButtonStyle}" Grid.Column="2">
-                        <Image Source="Icons/trash.png" Width="20" Height="20"/>
-                    </Button>
+        
+                    <!-- Popup và nút More Options -->
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                        <Button x:Name="MoreOptionsButton"
+            Width="30" Height="30"
+            Background="Transparent"
+            BorderBrush="Transparent"
+            Click="MoreOptionsButton_Click"
+            ToolTip="More Options"
+                                Style="{StaticResource WindowButtonStyle}">
+                            <Image Source="Icons/more_options.png" Width="20" Height="20"/>
+                        </Button>
+
+                        <Popup x:Name="DeletePopup"
+           Placement="Top"
+           PlacementTarget="{Binding ElementName=MoreOptionsButton}"
+           StaysOpen="False"
+           AllowsTransparency="True">
+                            <Border Background="White" CornerRadius="8" Padding="5" BorderBrush="LightGray" BorderThickness="1">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" >
+    <!-- Nút Trash -->
+    <Button Width="30" Height="30"
+            Background="Transparent"
+            BorderBrush="Transparent"
+            Click="DeleteUserButton_Click"
+            Style="{StaticResource WindowButtonStyle}">
+        <Image Source="Icons/trash.png" Width="20" Height="20"/>
+    </Button>
+
+    <!-- Nút Thumbtack -->
+    <Button Width="30" Height="30"
+            Background="Transparent"
+            BorderBrush="Transparent"
+            Click="ThumbtackButton_Click"
+            Style="{StaticResource WindowButtonStyle}">
+        <Image Source="Icons/thumbtack.png" Width="20" Height="20"/>
+    </Button>
+
+    <!-- Nút Block -->
+    <Button Width="30" Height="30"
+            Background="Transparent"
+            BorderBrush="Transparent"
+            Click="BlockUserButton_Click"
+            Style="{StaticResource WindowButtonStyle}">
+        <Image Source="Icons/block.png" Width="20" Height="20"/>
+    </Button>
+</StackPanel>
+                            </Border>
+                            
+                        </Popup>
+                    </StackPanel>
+
                 </Grid>
+
+                <!-- Hover effect -->
+                <Border.RenderTransform>
+                    <ScaleTransform ScaleX="1" ScaleY="1"/>
+                </Border.RenderTransform>
+                <Border.RenderTransformOrigin>0.5,0.5</Border.RenderTransformOrigin>
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background" Value="White"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                             To="1.05" Duration="0:0:0.15"/>
+                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                             To="1.05" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                             To="1" Duration="0:0:0.15"/>
+                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                             To="1" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
             </Border>
         </DataTemplate>
+
+        
     </Window.Resources>
-    <Border Background="White" CornerRadius="30">
+    <Border Background="DarkGray" CornerRadius="30">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" MinWidth="220" MaxWidth="350"/>
+                <ColumnDefinition Width="280"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="230"/>
             </Grid.ColumnDefinitions>
@@ -182,16 +291,32 @@
             </StackPanel>
 
             <!-- Thông tin người dùng hiện tại -->
-            <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="20,10">
+            <Grid Grid.Row="0" Grid.Column="0" Margin="20,10" HorizontalAlignment="Left" VerticalAlignment="Top">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <!-- Cột cho Avatar -->
+                    <ColumnDefinition Width="*"/>
+                    <!-- Cột cho Tên người dùng -->
+                    <ColumnDefinition Width="Auto"/>
+                    <!-- Cột cho nút Logout -->
+                </Grid.ColumnDefinitions>
+
+                <!-- Avatar -->
                 <Image Source="{Binding Source={x:Static local:App.CurrentUser}, Path=Avatar, Converter={StaticResource ImageUrlConverter}, FallbackValue='Icons/user.png'}" 
-                       Width="30" Height="30" Margin="0,0,10,0" 
-                       MouseLeftButtonDown="UserAvatar_Click" 
-                       Cursor="Hand" RenderTransformOrigin="1,1"/>
-                <TextBlock x:Name="UsernameTextBlock" VerticalAlignment="Center" FontSize="16" FontWeight="Bold" Foreground="Black" Margin="0,0,10,0"/>
-                <Button Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="LogoutButton_Click" Style="{StaticResource WindowButtonStyle}">
+           Width="30" Height="30" Margin="0,0,10,0" 
+           MouseLeftButtonDown="UserAvatar_Click" 
+           Cursor="Hand" RenderTransformOrigin="1,1"
+           Grid.Column="0"/>
+
+                <!-- Tên người dùng -->
+                <TextBlock x:Name="UsernameTextBlock" VerticalAlignment="Center" FontSize="16" FontWeight="Bold" Foreground="Black" 
+               TextTrimming="CharacterEllipsis" Margin="0,0,10,0" Grid.Column="1"/>
+
+                <!-- Nút Logout -->
+                <Button Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="LogoutButton_Click" Style="{StaticResource WindowButtonStyle}" Grid.Column="2">
                     <Image Source="Icons/logout.png" Width="20" Height="20"/>
                 </Button>
-            </StackPanel>
+            </Grid>
 
             <!-- Cột danh sách người dùng -->
             <Border Grid.Row="1" Grid.Column="0" Background="WhiteSmoke" CornerRadius="20,0,0,30" Margin="10,10,0,10">
@@ -200,69 +325,234 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10">
-                        <TextBox x:Name="SearchTextBox" Width="200" Visibility="Collapsed" Style="{StaticResource SearchTextBoxStyle}" TextChanged="SearchTextBox_TextChanged"/>
-                        <Button Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Margin="0,0,5,0" Click="SearchButtonListUser_Click" Style="{StaticResource WindowButtonStyle}">
+                    <!-- Bỏ StackPanel - Thay bằng Grid -->
+                    <Grid Grid.Row="0" Margin="10" HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Thanh SearchTextBox -->
+                        <TextBox x:Name="SearchTextBox"
+             Grid.Column="0"
+             Visibility="Hidden"
+             Style="{StaticResource SearchTextBoxStyle}"
+             VerticalAlignment="Center"
+             HorizontalAlignment="Stretch"
+             Margin="0,0,5,0"
+             TextChanged="SearchTextBox_TextChanged"/>
+
+                        <!-- Nút Search -->
+                        <Button x:Name="SearchButton"
+            Grid.Column="1"
+            Width="30"
+            Height="30"
+            Background="Transparent"
+            BorderBrush="Transparent"
+            Click="SearchButtonListUser_Click"
+            Style="{StaticResource WindowButtonStyle}">
                             <Image Source="Icons/search.png" Width="20" Height="20"/>
                         </Button>
-                        <Button Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="NotificationButton_Click" Style="{StaticResource WindowButtonStyle}">
+
+                        <!-- Nút Notification -->
+                        <Button x:Name="NotificationButton"
+        Width="30"
+        Height="30"
+        Grid.Column="2"
+        Background="Transparent"
+        BorderBrush="Transparent"
+        Click="NotificationButton_Click"
+        Style="{StaticResource WindowButtonStyle}">
                             <Image Source="Icons/notification.png" Width="20" Height="20"/>
                         </Button>
-                        <Button Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="MoreOptionsButton_Click" Style="{StaticResource WindowButtonStyle}">
-                            <Image Source="Icons/more_options.png" Width="20" Height="20"/>
-                        </Button>
-                        <Button x:Name="UserAddButton" Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Visibility="Collapsed" Click="UserAddButton_Click" Style="{StaticResource WindowButtonStyle}">
-                            <Image Source="Icons/user_add.png" Width="20" Height="20"/>
-                        </Button>
-                        <Button x:Name="AddGroupsButton" Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Visibility="Collapsed" Click="AddGroupsButton_Click" Style="{StaticResource WindowButtonStyle}">
+                        <Popup x:Name="NotificationPopup"
+       Placement="Bottom"
+       PlacementTarget="{Binding ElementName=NotificationButton}"
+       StaysOpen="False"
+       AllowsTransparency="True"
+       PopupAnimation="Slide">
+
+                            <Border Background="White"
+            BorderBrush="Gray"
+            BorderThickness="1"
+            CornerRadius="5"
+            Padding="10"
+            Width="250" Height="300">
+
+                                <StackPanel>
+                                    
+                                </StackPanel>
+
+                            </Border>
+                        </Popup>
+
+                        <!-- Nút AddGroups -->
+                        <Button x:Name="AddGroupsButton"
+            Width="30"
+            Height="30"
+            Grid.Column="3"
+            Background="Transparent"
+            BorderBrush="Transparent"
+            Click="AddGroupsButton_Click"
+            Style="{StaticResource WindowButtonStyle}">
                             <Image Source="Icons/add_groups.png" Width="20" Height="20"/>
                         </Button>
-                    </StackPanel>
+                    </Grid>
+
                     <!-- TabControl cho danh sách bạn bè và thêm bạn -->
-                    <TabControl Grid.Row="1" Margin="5" SelectionChanged="TabControl_SelectionChanged">
-                        <TabItem Header="Friends">
+                    <TabControl x:Name="TabControl" Grid.Row="1" SelectionChanged="TabControl_SelectionChanged">
+                        <TabItem>
+                            <TabItem.Header>
+                                <Button x:Name="ChatTabButton" Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="ChatTabButton_Click" Style="{StaticResource WindowButtonStyle}">
+                                    <Image Source="Icons/chat.png" Width="20" Height="20"/>
+                                </Button>
+                            </TabItem.Header>
+                            <!-- Nội dung tab Chat -->
                             <ListBox x:Name="UserListBox" Style="{StaticResource RoundedListBoxStyle}" 
-                                     ItemsSource="{Binding Friends, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" 
-                                     ItemTemplate="{StaticResource UserBoxTemplate}" SelectionChanged="UserListBox_SelectionChanged"/>
+         ItemsSource="{Binding Friends, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" 
+         ItemTemplate="{StaticResource UserBoxTemplate}" 
+         SelectionChanged="UserListBox_SelectionChanged"
+         HorizontalContentAlignment="Stretch">
+
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="BorderBrush" Value="Transparent"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="Padding" Value="0"/>
+                                        <Setter Property="Margin" Value="0"/>
+                                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                        <Setter Property="OverridesDefaultStyle" Value="True"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListBoxItem">
+                                                    <ContentPresenter/>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+
+                            </ListBox>
+
                         </TabItem>
-                        <TabItem Header="Add Friends">
-                            <StackPanel>
-                                <ListBox x:Name="AllUsersListBox" Style="{StaticResource RoundedListBoxStyle}">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Background="WhiteSmoke" BorderBrush="Transparent" BorderThickness="0" CornerRadius="10" Padding="10" Margin="5" Width="200">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="50"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="50"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <Image Source="{Binding Avatar, Converter={StaticResource ImageUrlConverter}, FallbackValue='Icons/user.png'}" 
-                                                           Width="40" Height="40" Margin="0,0,10,0" Grid.Column="0"/>
-                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                        <TextBlock Text="{Binding DisplayName}" FontSize="16" FontWeight="Bold" Foreground="Black"/>
-                                                    </StackPanel>
-                                                    <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                                        <Button x:Name="AddFriendButton" Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" 
-                                                                Click="AddFriend_Click" Style="{StaticResource WindowButtonStyle}" Tag="{Binding Id}">
-                                                            <Image x:Name="AddFriendIcon" Source="Icons/user_add.png" Width="20" Height="20"/>
-                                                        </Button>
-                                                        <Button x:Name="CancelFriendButton" Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" 
-                                                                Click="CancelFriendRequest_Click" Style="{StaticResource WindowButtonStyle}" Tag="{Binding Id}" Visibility="Collapsed">
-                                                            <Image Source="Icons/cancel.png" Width="20" Height="20"/>
-                                                        </Button>
-                                                    </StackPanel>
-                                                </Grid>
-                                            </Border>
-                                            <!-- Di chuyển DataTrigger vào DataTemplate.Triggers -->
-                                            <DataTemplate.Triggers>
-                                                <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType={x:Type ListBoxItem}}, Path=DataContext, Converter={StaticResource HasPendingRequestConverter}}" Value="True">
-                                                    <Setter TargetName="AddFriendButton" Property="Visibility" Value="Collapsed"/>
-                                                    <Setter TargetName="CancelFriendButton" Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </DataTemplate.Triggers>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
+                        <TabItem>
+                            <TabItem.Header>
+                                <Button x:Name="AddFriendsTabButton" Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="AddFriendsTabButton_Click" Style="{StaticResource WindowButtonStyle}">
+                                    <Image Source="Icons/user_add.png" Width="20" Height="20"/>
+                                </Button>
+                            </TabItem.Header>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="10">
+                                <StackPanel>
+                                    <ListBox x:Name="AllUsersListBox" Style="{StaticResource RoundedListBoxStyle}">
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="ListBoxItem">
+                                                <Setter Property="Background" Value="Transparent"/>
+                                                <Setter Property="BorderBrush" Value="Transparent"/>
+                                                <Setter Property="BorderThickness" Value="0"/>
+                                                <Setter Property="Padding" Value="0"/>
+                                                <Setter Property="Margin" Value="0"/>
+                                                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                                <Setter Property="OverridesDefaultStyle" Value="True"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                            <ContentPresenter/>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="White" 
+                                BorderBrush="#E0E0E0" 
+                                BorderThickness="1" 
+                                CornerRadius="12" 
+                                Padding="10" 
+                                Margin="5"
+                                SnapsToDevicePixels="True">
+                                                    <Border.Effect>
+                                                        <DropShadowEffect BlurRadius="10" ShadowDepth="2" Color="Gray" Opacity="0.2"/>
+                                                    </Border.Effect>
+                                                    <Border.RenderTransform>
+                                                        <ScaleTransform ScaleX="1" ScaleY="1"/>
+                                                    </Border.RenderTransform>
+                                                    <Border.RenderTransformOrigin>0.5,0.5</Border.RenderTransformOrigin>
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Style.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Trigger.EnterActions>
+                                                                        <BeginStoryboard>
+                                                                            <Storyboard>
+                                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.05" Duration="0:0:0.15"/>
+                                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.05" Duration="0:0:0.15"/>
+                                                                            </Storyboard>
+                                                                        </BeginStoryboard>
+                                                                    </Trigger.EnterActions>
+                                                                    <Trigger.ExitActions>
+                                                                        <BeginStoryboard>
+                                                                            <Storyboard>
+                                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1" Duration="0:0:0.15"/>
+                                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1" Duration="0:0:0.15"/>
+                                                                            </Storyboard>
+                                                                        </BeginStoryboard>
+                                                                    </Trigger.ExitActions>
+                                                                </Trigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <!-- Avatar -->
+                                                        <Border Width="50" Height="50" CornerRadius="25" ClipToBounds="True" Grid.Column="0">
+                                                            <Image Source="{Binding Avatar, Converter={StaticResource ImageUrlConverter}, FallbackValue='Icons/user.png'}"
+                                                                    Width="50" Height="50"
+                                                                    Stretch="UniformToFill"/>
+                                                        </Border>
+
+                                                        <!-- User Info -->
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0">
+                                                            <TextBlock Text="{Binding DisplayName}" 
+                                                                        FontSize="16" 
+                                                                        FontWeight="SemiBold" 
+                                                                        Foreground="#333333"/>
+                                                        </StackPanel>
+
+                                                        <!-- Add/Cancel Friend Buttons -->
+                                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <Button x:Name="AddFriendButton" Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" 
+                                                                    Click="AddFriend_Click" Style="{StaticResource WindowButtonStyle}" Tag="{Binding Id}">
+                                                                <Image x:Name="AddFriendIcon" Source="Icons/user_add.png" Width="20" Height="20"/>
+                                                            </Button>
+                                                            <Button x:Name="CancelFriendButton" Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" 
+                                                                    Click="CancelFriendRequest_Click" Style="{StaticResource WindowButtonStyle}" Tag="{Binding Id}" Visibility="Collapsed">
+                                                                <Image Source="Icons/cancel.png" Width="20" Height="20"/>
+                                                            </Button>
+                                                        </StackPanel>
+                                                    </Grid>
+
+                                                   
+                                                </Border>
+
+                                                <!-- DataTemplate.Triggers để điều chỉnh button trạng thái -->
+                                                <DataTemplate.Triggers>
+                                                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType={x:Type ListBoxItem}}, Path=DataContext, Converter={StaticResource HasPendingRequestConverter}}" Value="True">
+                                                        <Setter TargetName="AddFriendButton" Property="Visibility" Value="Collapsed"/>
+                                                        <Setter TargetName="CancelFriendButton" Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
                                 </ListBox>
                                 <ListBox x:Name="FriendRequestsListBox" Style="{StaticResource RoundedListBoxStyle}" Margin="5">
                                     <ListBox.ItemTemplate>
@@ -313,13 +603,14 @@
                                 </ListBox>
                                 <Button Content="View Sent Friend Requests" Click="ViewSentFriendRequests_Click" Margin="5" Style="{StaticResource WindowButtonStyle}"/>
                             </StackPanel>
+                            </ScrollViewer>
                         </TabItem>
                     </TabControl>
                 </Grid>
             </Border>
 
             <!-- Cột khu vực chat -->
-            <Border Grid.Row="1" Grid.Column="1" Background="#ECF0F1" CornerRadius="0,20,20,0" Margin="10">
+            <Border Grid.Row="1" Grid.Column="1" Background="#ECF0F1" CornerRadius="0,20,20,0" Margin="10,10,0,10">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -335,7 +626,7 @@
                     <TextBlock x:Name="ChatWithTextBlock" Grid.Row="0" Grid.Column="0" Text="Chat with [User]" FontSize="20" FontWeight="Bold" Foreground="Black" Margin="10"/>
                     <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10">
                         <TextBox x:Name="ChatSearchTextBox" Width="200" Visibility="Collapsed" Style="{StaticResource SearchTextBoxStyle}"/>
-                        <Button Width="40" Height="40" Background="Transparent" BorderBrush="Transparent" Margin="0,0,10,0" Click="SearchButtonChat_Click" Style="{StaticResource WindowButtonStyle}">
+                        <Button x:Name="SearchChatButton" Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="SearchButtonChat_Click" Style="{StaticResource WindowButtonStyle}">
                             <Image Source="Icons/search.png" Width="20" Height="20"/>
                         </Button>
                         <Button Width="40" Height="40" Background="Transparent" BorderBrush="Transparent" Margin="0,0,10,0" Click="VoiceCallButton_Click" Style="{StaticResource WindowButtonStyle}">
@@ -344,6 +635,9 @@
                         <Button Width="40" Height="40" Background="Transparent" BorderBrush="Transparent" Margin="0,0,10,0" Click="VideoCallButton_Click" Style="{StaticResource WindowButtonStyle}">
                             <Image Source="Icons/video_call.png" Width="20" Height="20"/>
                         </Button>
+                        <Button Width="40" Height="40" Background="Transparent" BorderBrush="Transparent" Margin="0,0,10,0" Click="Optional_Click" Style="{StaticResource WindowButtonStyle}">
+                            <Image Source="Icons/optional.png" Width="20" Height="20"/>
+                        </Button>
                     </StackPanel>
 
                     <!-- Khu vực hiển thị tin nhắn -->
@@ -351,6 +645,7 @@
                         <StackPanel x:Name="MessagesStackPanel">
                             <!-- Tin nhắn sẽ được thêm vào đây -->
                         </StackPanel>
+                        
                     </ScrollViewer>
                     <Grid Grid.Row="2" Grid.ColumnSpan="2" VerticalAlignment="Bottom" Margin="10">
                         <Grid.ColumnDefinitions>
@@ -359,61 +654,88 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                            <StackPanel x:Name="AttachOptionsPanel" Orientation="Horizontal" Visibility="Collapsed">
-                                <Button x:Name="ImageButton" Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="ImageButton_Click" Style="{StaticResource WindowButtonStyle}">
-                                    <Image Source="Icons/image.png" Width="20" Height="20"/>
-                                </Button>
-                                <Button x:Name="DownloadButton" Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="DownloadButton_Click" Style="{StaticResource WindowButtonStyle}">
-                                    <Image Source="Icons/download.png" Width="20" Height="20"/>
-                                </Button>
-                            </StackPanel>
-                            <!-- Thêm EmojiPanel -->
-                            <StackPanel x:Name="EmojiPanel" Orientation="Horizontal" Visibility="Collapsed">
-                                <Button Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="EmojiButton_Click" Style="{StaticResource WindowButtonStyle}">
-                                    <TextBlock Text="👍" FontSize="20"/>
-                                </Button>
-                                <Button Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="EmojiButton_Click" Style="{StaticResource WindowButtonStyle}">
-                                    <TextBlock Text="❤️" FontSize="20"/>
-                                </Button>
-                                <Button Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="EmojiButton_Click" Style="{StaticResource WindowButtonStyle}">
-                                    <TextBlock Text="😊" FontSize="20"/>
-                                </Button>
-                                <Button Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="EmojiButton_Click" Style="{StaticResource WindowButtonStyle}">
-                                    <TextBlock Text="😂" FontSize="20"/>
-                                </Button>
-                                <Button Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="EmojiButton_Click" Style="{StaticResource WindowButtonStyle}">
-                                    <TextBlock Text="😍" FontSize="20"/>
-                                </Button>
-                            </StackPanel>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <StackPanel Margin="5" Grid.Column="0" Orientation="Vertical" VerticalAlignment="Bottom" HorizontalAlignment="Left">
+                                <Popup x:Name="AttachOptionsPanel" Placement="Top" PlacementTarget="{Binding ElementName=AttachButton}" StaysOpen="False" AllowsTransparency="True">
+                                    <Border Background="White" BorderBrush="LightGray" BorderThickness="1" CornerRadius="10" SnapsToDevicePixels="True">
+                                        <StackPanel Orientation="Horizontal" Margin="5">
+                                            <Button x:Name="ImageButton" Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="ImageButton_Click" Style="{StaticResource WindowButtonStyle}">
+                                                <Image Source="Icons/image.png" Width="20" Height="20"/>
+                                            </Button>
+                                            <Button x:Name="DownloadButton" Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="DownloadButton_Click" Style="{StaticResource WindowButtonStyle}">
+                                                <Image Source="Icons/download.png" Width="20" Height="20"/>
+                                            </Button>
+                                        </StackPanel>
+                                    </Border>
+                                </Popup>
+
+
+                                <!-- Thêm EmojiPanel -->
+                            
+                            <!-- Attach Button -->
                             <Button x:Name="AttachButton" Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="AttachButton_Click" Style="{StaticResource WindowButtonStyle}">
                                 <Image Source="Icons/attach.png" Width="20" Height="20" RenderTransformOrigin="1,1"/>
                             </Button>
-                            <Button x:Name="VoiceRecordButton" Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="VoiceRecordButton_Click" Style="{StaticResource WindowButtonStyle}">
+                            
+                        </StackPanel>
+                        <Button x:Name="VoiceRecordButton" Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="VoiceRecordButton_Click" Style="{StaticResource WindowButtonStyle}">
                                 <Image Source="Icons/voice_record.png" Width="20" Height="20" RenderTransformOrigin="1,1"/>
                             </Button>
                         </StackPanel>
                         <TextBox x:Name="MessageTextBox" Grid.Column="1" Style="{StaticResource MessageTextBoxStyle}" KeyDown="MessageTextBox_KeyDown"/>
                         <UniformGrid Grid.Column="2" Columns="2" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <!-- Nút Like -->
                             <Button x:Name="LikeButton" Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="LikeButton_Click" Style="{StaticResource WindowButtonStyle}">
                                 <Image Source="Icons/like.png" Width="20" Height="20"/>
                             </Button>
+
+                            <!-- Popup cho Emoji -->
+                            <Popup x:Name="EmojiPopup" Placement="Top" PlacementTarget="{Binding ElementName=LikeButton}" StaysOpen="False" AllowsTransparency="True">
+                                <Border Background="White" CornerRadius="8" Padding="5" BorderBrush="LightGray" BorderThickness="1">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <!-- Thêm các nút emoji -->
+                                        <Button Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="EmojiButton_Click" Tag="cuoikhinh" Style="{StaticResource WindowButtonStyle}">
+                                            <Image Source="Emoji/cuoikhinh.png" Width="20" Height="20"/>
+                                        </Button>
+                                        <Button Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="EmojiButton_Click" Tag="haha" Style="{StaticResource WindowButtonStyle}">
+                                            <Image Source="Emoji/haha.png" Width="20" Height="20"/>
+                                        </Button>
+                                        <Button Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="EmojiButton_Click" Tag="khongcamxuc" Style="{StaticResource WindowButtonStyle}">
+                                            <Image Source="Emoji/khongcamxuc.png" Width="20" Height="20"/>
+                                        </Button>
+                                        <Button Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="EmojiButton_Click" Tag="ngau" Style="{StaticResource WindowButtonStyle}">
+                                            <Image Source="Emoji/ngau.png" Width="20" Height="20"/>
+                                        </Button>
+                                        <Button Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="EmojiButton_Click" Tag="phanno" Style="{StaticResource WindowButtonStyle}">
+                                            <Image Source="Emoji/phanno.png" Width="20" Height="20"/>
+                                        </Button>
+                                        <Button Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="EmojiButton_Click" Tag="emolike" Style="{StaticResource WindowButtonStyle}">
+                                            <Image Source="Emoji/emolike.png" Width="20" Height="20"/>
+                                        </Button>
+                                    </StackPanel>
+                                </Border>
+                            </Popup>
+
+                            <!-- Nút Send -->
                             <Button x:Name="SendButton" Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="SendButton_Click" Style="{StaticResource WindowButtonStyle}">
                                 <Image Source="Icons/send.png" Width="20" Height="20"/>
                             </Button>
                         </UniformGrid>
+
                     </Grid>
                 </Grid>
             </Border>
 
             <!-- Cột hồ sơ người dùng -->
-            <Border Grid.Row="1" Grid.Column="2" Background="#2C3E50" CornerRadius="0,0,30,0" Margin="10">
+            <Border Grid.Row="1" Grid.Column="2" Background="CadetBlue" CornerRadius="0,0,30,0" Margin="10">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="10">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            
                             <Button x:Name="UserPenButton" Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="UserPenButton_Click" Style="{StaticResource WindowButtonStyle}">
                                 <Image Source="Icons/user_pen.png" Width="20" Height="20"/>
                             </Button>
+                            
                         </StackPanel>
                         <TextBlock Text="User Profile" FontSize="24" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
                         <Image x:Name="ProfileAvatar" Width="100" Height="100" Margin="0,10,0,10" Cursor="Hand"/>
@@ -426,3 +748,4 @@
         </Grid>
     </Border>
 </Window>
+    

@@ -401,13 +401,9 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
-    <None Include=".env">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
+    <None Include=".env" />
     <None Include=".env.example" />
-    <None Include="firebase-service-account.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
+    <None Include="firebase-service-account.json" />
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
@@ -508,7 +504,24 @@
     <Resource Include="Icons\cancel.png" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="Icons\check.png" />
+    <Resource Include="Icons\optional.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\chat.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Emoji\cuoikhinh.png" />
+    <Resource Include="Emoji\cuoivui.png" />
+    <Resource Include="Emoji\haha.png" />
+    <Resource Include="Emoji\khongcamxuc.png" />
+    <Resource Include="Emoji\ngau.png" />
+    <Resource Include="Emoji\phanno.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Emoji\emolike.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\thumbtack.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\Google.Api.CommonProtos.2.16.0\build\Google.Api.CommonProtos.targets" Condition="Exists('..\packages\Google.Api.CommonProtos.2.16.0\build\Google.Api.CommonProtos.targets')" />

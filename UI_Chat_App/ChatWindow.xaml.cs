@@ -17,6 +17,7 @@ using System.Windows.Threading;
 using UI_Chat_App.Converters;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Windows.Controls.Primitives;
 
 namespace UI_Chat_App
 {
@@ -259,32 +260,18 @@ namespace UI_Chat_App
                     await Dispatcher.InvokeAsync(() =>
                     {
                         _messages.Clear();
+                        MessagesStackPanel.Children.Clear();
+
                         foreach (var message in messages)
                         {
-                            // Đánh dấu tin nhắn là "đã xem" nếu người nhận là người dùng hiện tại
                             if (!message.IsSeen && message.ReceiverId == App.CurrentUser.Id)
                             {
                                 message.IsSeen = true;
-                                _databaseService.MarkMessageAsSeenAsync(_currentChatRoomId, message.MessageId).ContinueWith(t =>
-                                {
-                                    if (t.IsFaulted)
-                                        Console.WriteLine($"Failed to mark message as seen: {t.Exception.Message}");
-                                    else
-                                        Console.WriteLine($"Marked message as seen: {message.Timestamp}");
-                                });
+                                _ = _databaseService.MarkMessageAsSeenAsync(_currentChatRoomId, message.MessageId);
                             }
                             _messages.Add(message);
-                        }
 
-                        // Cập nhật giao diện tin nhắn
-                        MessagesStackPanel.Children.Clear();
-                        foreach (var message in _messages)
-                        {
-                            var stackPanel = new StackPanel
-                            {
-                                HorizontalAlignment = message.SenderId == App.CurrentUser.Id ? HorizontalAlignment.Right : HorizontalAlignment.Left,
-                                Margin = new Thickness(5, 5, 5, 0)
-                            };
+                            var isMine = message.SenderId == App.CurrentUser.Id;
 
                             if (message.MessageType == "Voice")
                             {
@@ -294,10 +281,9 @@ namespace UI_Chat_App
                                     {
                                         Text = "Lỗi: Tin nhắn thoại không khả dụng",
                                         Foreground = Brushes.Red,
-                                        Margin = new Thickness(5, 0, 5, 0),
-                                        HorizontalAlignment = message.SenderId == App.CurrentUser.Id ? HorizontalAlignment.Right : HorizontalAlignment.Left
+                                        FontSize = 14
                                     };
-                                    stackPanel.Children.Add(errorText);
+                                    MessagesStackPanel.Children.Add(CreateMessageBubble(errorText, isMine));
                                     continue;
                                 }
 
@@ -313,8 +299,7 @@ namespace UI_Chat_App
                                     {
                                         Content = "Phát tin nhắn thoại",
                                         Tag = tempFilePath,
-                                        Margin = new Thickness(5, 0, 5, 0),
-                                        HorizontalAlignment = message.SenderId == App.CurrentUser.Id ? HorizontalAlignment.Right : HorizontalAlignment.Left
+                                        Margin = new Thickness(5, 0, 5, 0)
                                     };
                                     playButton.Click += (s, e) =>
                                     {
@@ -338,19 +323,17 @@ namespace UI_Chat_App
                                         }
                                     };
 
-                                    stackPanel.Children.Add(playButton);
+                                    MessagesStackPanel.Children.Add(CreateMessageBubble(playButton, isMine));
                                 }
-                                catch (Exception ex)
+                                catch (Exception)
                                 {
-                                    Console.WriteLine($"Không thể tải tin nhắn thoại từ {message.FileUrl}: {ex.Message}");
                                     var errorText = new TextBlock
                                     {
                                         Text = "Lỗi: Tin nhắn thoại không khả dụng",
                                         Foreground = Brushes.Red,
-                                        Margin = new Thickness(5, 0, 5, 0),
-                                        HorizontalAlignment = message.SenderId == App.CurrentUser.Id ? HorizontalAlignment.Right : HorizontalAlignment.Left
+                                        FontSize = 14
                                     };
-                                    stackPanel.Children.Add(errorText);
+                                    MessagesStackPanel.Children.Add(CreateMessageBubble(errorText, isMine));
                                 }
                             }
                             else if (message.MessageType == "Image")
@@ -358,8 +341,7 @@ namespace UI_Chat_App
                                 var image = new Image
                                 {
                                     Width = 200,
-                                    Height = 200,
-                                    HorizontalAlignment = message.SenderId == App.CurrentUser.Id ? HorizontalAlignment.Right : HorizontalAlignment.Left
+                                    Height = 200
                                 };
                                 var binding = new Binding("FileUrl")
                                 {
@@ -368,7 +350,7 @@ namespace UI_Chat_App
                                     FallbackValue = new BitmapImage(new Uri("pack://application:,,,/Icons/user.png", UriKind.Absolute))
                                 };
                                 image.SetBinding(Image.SourceProperty, binding);
-                                stackPanel.Children.Add(image);
+                                MessagesStackPanel.Children.Add(CreateMessageBubble(image, isMine));
                             }
                             else if (message.MessageType == "File")
                             {
@@ -389,64 +371,68 @@ namespace UI_Chat_App
                                 var textBlock = new TextBlock
                                 {
                                     Inlines = { hyperlink },
-                                    Style = message.SenderId == App.CurrentUser.Id
-                                        ? (Style)FindResource("RightAlignedMessageStyle")
-                                        : new Style(typeof(TextBlock))
-                                        {
-                                            Setters =
-                                            {
-                                                new Setter(TextBlock.FontSizeProperty, 16.0),
-                                                new Setter(TextBlock.ForegroundProperty, Brushes.Black),
-                                                new Setter(TextBlock.BackgroundProperty, Brushes.LightGray),
-                                                new Setter(TextBlock.MarginProperty, new Thickness(0)),
-                                                new Setter(TextBlock.PaddingProperty, new Thickness(10)),
-                                                new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Left),
-                                                new Setter(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Left),
-                                                new Setter(TextBlock.TextWrappingProperty, TextWrapping.Wrap)
-                                            }
-                                        }
+                                    FontSize = 16,
+                                    TextWrapping = TextWrapping.Wrap
                                 };
-                                stackPanel.Children.Add(textBlock);
+                                MessagesStackPanel.Children.Add(CreateMessageBubble(textBlock, isMine));
                             }
+                            else if (message.MessageType == "Emoji")
+                            {
+                                try
+                                {
+                                    var emojiPath = $"pack://application:,,,/Emoji/{message.Content}.png";
+                                    var emojiImage = new Image
+                                    {
+                                        Source = new BitmapImage(new Uri(emojiPath, UriKind.Absolute)),
+                                        Width = 40,
+                                        Height = 40,
+                                        Stretch = Stretch.Uniform
+                                    };
+
+                                    var emojiContainer = new Border
+                                    {
+                                        Child = emojiImage,
+                                        Background = isMine ? Brushes.LightGreen : Brushes.White,
+                                        CornerRadius = new CornerRadius(10),
+                                        Padding = new Thickness(10),
+                                        Margin = new Thickness(5),
+                                        HorizontalAlignment = isMine ? HorizontalAlignment.Right : HorizontalAlignment.Left,
+                                        Effect = new System.Windows.Media.Effects.DropShadowEffect
+                                        {
+                                            BlurRadius = 5,
+                                            Opacity = 0.2,
+                                            ShadowDepth = 2
+                                        }
+                                    };
+
+                                    MessagesStackPanel.Children.Add(emojiContainer);
+                                    continue;
+                                }
+                                catch
+                                {
+                                    MessagesStackPanel.Children.Add(new TextBlock
+                                    {
+                                        Text = "[Không thể hiển thị emoji]",
+                                        Foreground = Brushes.Red,
+                                        FontSize = 14,
+                                        Margin = new Thickness(5),
+                                        HorizontalAlignment = isMine ? HorizontalAlignment.Right : HorizontalAlignment.Left
+                                    });
+                                    continue;
+                                }
+                            }
+
+
                             else
                             {
-                                var textBlock = new TextBlock
-                                {
-                                    Text = message.Content,
-                                    Style = message.SenderId == App.CurrentUser.Id
-                                        ? (Style)FindResource("RightAlignedMessageStyle")
-                                        : new Style(typeof(TextBlock))
-                                        {
-                                            Setters =
-                                            {
-                                                new Setter(TextBlock.FontSizeProperty, IsEmoji(message.Content) ? 24.0 : 16.0),
-                                                new Setter(TextBlock.ForegroundProperty, IsEmoji(message.Content) ? Brushes.Blue : Brushes.Black),
-                                                new Setter(TextBlock.BackgroundProperty, Brushes.LightGray),
-                                                new Setter(TextBlock.MarginProperty, new Thickness(0)),
-                                                new Setter(TextBlock.PaddingProperty, new Thickness(10)),
-                                                new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Left),
-                                                new Setter(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Left),
-                                                new Setter(TextBlock.TextWrappingProperty, TextWrapping.Wrap)
-                                            }
-                                        }
-                                };
-                                stackPanel.Children.Add(textBlock);
+                                var bubble = CreateMessageBubble(
+                                    message.Content,
+                                    DateTime.Parse(message.Timestamp).ToLocalTime().ToShortTimeString(),
+                                    isMine,
+                                    message.IsSeen
+                                );
+                                MessagesStackPanel.Children.Add(bubble);
                             }
-
-                            if (message.SenderId == App.CurrentUser.Id && message.IsSeen)
-                            {
-                                var seenText = new TextBlock
-                                {
-                                    Text = "✔ Seen",
-                                    FontSize = 12,
-                                    Foreground = Brushes.Green,
-                                    HorizontalAlignment = message.SenderId == App.CurrentUser.Id ? HorizontalAlignment.Right : HorizontalAlignment.Left,
-                                    Margin = new Thickness(0, 2, 0, 0)
-                                };
-                                stackPanel.Children.Add(seenText);
-                            }
-
-                            MessagesStackPanel.Children.Add(stackPanel);
                         }
 
                         MessagesScrollViewer.ScrollToEnd();
@@ -458,6 +444,109 @@ namespace UI_Chat_App
                 Console.WriteLine($"Failed to refresh messages: {ex.Message}");
             }
         }
+
+        private UIElement CreateMessageBubble(string text, string time, bool isMine, bool isSeen = false, string messageType = "Text", string fileUrl = null)
+        {
+            var stack = new StackPanel();
+
+            if (messageType == "Image" && !string.IsNullOrEmpty(fileUrl))
+            {
+                // Hiển thị hình ảnh emoji
+                var image = new Image
+                {
+                    Source = new BitmapImage(new Uri(fileUrl, UriKind.RelativeOrAbsolute)),
+                    Width = 80,
+                    Height = 80,
+                    Margin = new Thickness(0, 0, 0, 5),
+                    Stretch = Stretch.UniformToFill
+                };
+                stack.Children.Add(image);
+            }
+            else
+            {
+                // Hiển thị tin nhắn văn bản
+                var textBlock = new TextBlock
+                {
+                    Text = text,
+                    FontSize = 16,
+                    Foreground = Brushes.Black,
+                    Margin = new Thickness(0),
+                    Padding = new Thickness(10),
+                    TextAlignment = TextAlignment.Left,
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    TextWrapping = TextWrapping.Wrap
+                };
+                stack.Children.Add(textBlock);
+            }
+
+            // Thời gian gửi
+            var timeBlock = new TextBlock
+            {
+                Text = time,
+                FontSize = 10,
+                Foreground = Brushes.Gray,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 5, 0, 0)
+            };
+            stack.Children.Add(timeBlock);
+
+            // Trạng thái seen
+            if (isMine && isSeen)
+            {
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "✔ Seen",
+                    FontSize = 10,
+                    Foreground = Brushes.Green,
+                    HorizontalAlignment = HorizontalAlignment.Right
+                });
+            }
+
+            // Bọc trong Border
+            var border = new Border
+            {
+                Background = isMine ? Brushes.LightGreen : Brushes.White,
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(10),
+                Margin = new Thickness(5),
+                MaxWidth = 300,
+                Child = stack,
+                HorizontalAlignment = isMine ? HorizontalAlignment.Right : HorizontalAlignment.Left,
+                Effect = new System.Windows.Media.Effects.DropShadowEffect
+                {
+                    BlurRadius = 5,
+                    Opacity = 0.2,
+                    ShadowDepth = 2
+                }
+            };
+
+            return border;
+        }
+
+
+        private UIElement CreateMessageBubble(UIElement content, bool isMine)
+        {
+            var stack = new StackPanel();
+            stack.Children.Add(content);
+
+            return new Border
+            {
+                Background = isMine ? Brushes.LightGreen : Brushes.White,
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(10),
+                Margin = new Thickness(5),
+                MaxWidth = 300,
+                Child = stack,
+                HorizontalAlignment = isMine ? HorizontalAlignment.Right : HorizontalAlignment.Left,
+                Effect = new System.Windows.Media.Effects.DropShadowEffect
+                {
+                    BlurRadius = 5,
+                    Opacity = 0.2,
+                    ShadowDepth = 2
+                }
+            };
+        }
+
 
         private async Task LoadAllUsersAsync()
         {
@@ -695,13 +784,14 @@ namespace UI_Chat_App
 
         private void SearchButtonListUser_Click(object sender, RoutedEventArgs e)
         {
-            if (SearchTextBox.Visibility == Visibility.Collapsed)
+            if (SearchTextBox.Visibility == Visibility.Hidden)
             {
                 SearchTextBox.Visibility = Visibility.Visible;
+                SearchTextBox.Focus(); // Focus luôn để user gõ liền
             }
             else
             {
-                SearchTextBox.Visibility = Visibility.Collapsed;
+                SearchTextBox.Visibility = Visibility.Hidden;
             }
         }
 
@@ -789,37 +879,49 @@ namespace UI_Chat_App
         private void NotificationButton_Click(object sender, RoutedEventArgs e)
         {
             // Code xử lý khi nhấn nút thông báo
+            NotificationPopup.IsOpen = !NotificationPopup.IsOpen;
         }
 
         private void MoreOptionsButton_Click(object sender, RoutedEventArgs e)
         {
-            UserAddButton.Visibility = UserAddButton.Visibility == Visibility.Collapsed ? Visibility.Visible : Visibility.Collapsed;
-            AddGroupsButton.Visibility = AddGroupsButton.Visibility == Visibility.Collapsed ? Visibility.Visible : Visibility.Collapsed;
+            var button = sender as Button;
+            var stackPanel = button?.Parent as StackPanel;
+            var popup = stackPanel?.Children.OfType<Popup>().FirstOrDefault();
+            if (popup != null)
+                popup.IsOpen = true;
         }
 
-        private void UserAddButton_Click(object sender, RoutedEventArgs e)
+        private void AddFriendsTabButton_Click(object sender, RoutedEventArgs e)
         {
-            // Code xử lý khi nhấn nút thêm người dùng
+            // Chuyển sang tab Add Friends
+            TabControl.SelectedIndex = 1;
+            
         }
 
         private void AddGroupsButton_Click(object sender, RoutedEventArgs e)
         {
             // Code xử lý khi nhấn nút thêm nhóm
         }
-
+        private void ThumbtackButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Code xử lý khi nhấn nút thêm nhóm
+        }
+        private void BlockUserButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Code xử lý khi nhấn nút thêm nhóm
+        }
+        private void ChatTabButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Chuyển sang tab Chat
+            TabControl.SelectedIndex = 0;
+        }
+        private void Optional_Click(object sender, RoutedEventArgs e)
+        {
+            // Code xử lý khi nhấn nút xem thêm người dùng
+        }
         private void SearchButtonChat_Click(object sender, RoutedEventArgs e)
         {
-            if (SearchTextBox.Visibility == Visibility.Collapsed)
-            {
-                SearchTextBox.Visibility = Visibility.Visible;
-                SearchTextBox.Focus();
-            }
-            else
-            {
-                SearchTextBox.Visibility = Visibility.Collapsed;
-                SearchTextBox.Text = string.Empty;
-                UserListBox.ItemsSource = _users;
-            }
+            // Code xử lý khi nhấn nút tìm kiếm trong chat
         }
 
         private void VoiceCallButton_Click(object sender, RoutedEventArgs e)
@@ -834,7 +936,7 @@ namespace UI_Chat_App
 
         private void AttachButton_Click(object sender, RoutedEventArgs e)
         {
-            AttachOptionsPanel.Visibility = AttachOptionsPanel.Visibility == Visibility.Collapsed ? Visibility.Visible : Visibility.Collapsed;
+            AttachOptionsPanel.IsOpen = !AttachOptionsPanel.IsOpen;
         }
 
         private async void ImageButton_Click(object sender, RoutedEventArgs e)
@@ -989,43 +1091,42 @@ namespace UI_Chat_App
 
         private void LikeButton_Click(object sender, RoutedEventArgs e)
         {
-            EmojiPanel.Visibility = EmojiPanel.Visibility == Visibility.Collapsed ? Visibility.Visible : Visibility.Collapsed;
-            if (AttachOptionsPanel.Visibility == Visibility.Visible)
-            {
-                AttachOptionsPanel.Visibility = Visibility.Collapsed;
-            }
+            EmojiPopup.IsOpen = !EmojiPopup.IsOpen;
         }
+
 
         private async void EmojiButton_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedUser == null)
             {
-                MessageBox.Show("Vui lòng chọn người dùng để trò chuyện.", "Cảnh báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Please select a user to chat with.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             try
             {
                 var button = sender as Button;
-                var textBlock = button.Content as TextBlock;
-                string emoji = textBlock.Text;
+                string emojiKey = button?.Tag as string; // VD: "cuoi"
 
-                var message = new MessageData
+                if (!string.IsNullOrEmpty(emojiKey))
                 {
-                    SenderId = App.CurrentUser.Id,
-                    ReceiverId = _selectedUser.Id,
-                    Content = emoji,
-                    Timestamp = DateTime.UtcNow.ToString("o"),
-                    MessageType = "Text"
-                };
+                    var message = new MessageData
+                    {
+                        SenderId = App.CurrentUser.Id,
+                        ReceiverId = _selectedUser.Id,
+                        Content = emojiKey, // chính là tên ảnh
+                        Timestamp = DateTime.UtcNow.ToString("o"),
+                        MessageType = "Emoji" // dùng để phân biệt với Image
+                    };
 
-                await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
-                EmojiPanel.Visibility = Visibility.Collapsed;
-                await RefreshMessagesAsync();
+                    await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
+                    EmojiPopup.IsOpen = false;
+                    await RefreshMessagesAsync();
+                }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Không thể gửi tin nhắn emoji: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Failed to send emoji: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1174,11 +1275,7 @@ namespace UI_Chat_App
             }
         }
 
-        private bool IsEmoji(string content)
-        {
-            var emojis = new List<string> { "👍", "❤️", "😊", "😂", "😍" };
-            return emojis.Contains(content);
-        }
+       
 
         private void DeleteUserButton_Click(object sender, RoutedEventArgs e)
         {
