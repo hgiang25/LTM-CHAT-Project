@@ -17,6 +17,8 @@ using System.Windows.Threading;
 using UI_Chat_App.Converters;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using Google.Cloud.Firestore;
+using static Google.Cloud.Firestore.V1.StructuredAggregationQuery.Types.Aggregation.Types;
 using System.Windows.Controls.Primitives;
 
 namespace UI_Chat_App
@@ -30,6 +32,7 @@ namespace UI_Chat_App
         private ObservableCollection<FriendRequestWithUserInfo> _friendRequests; // Danh sách lời mời kết bạn
         private ObservableCollection<FriendRequestWithUserInfo> _sentFriendRequests; // Danh sách lời mời đã gửi
         private ObservableCollection<MessageData> _messages; // Danh sách tin nhắn
+        private ObservableCollection<NotificationData> _notifications;
         private UserData _selectedUser;
         private string _currentChatRoomId;
         private string _idToken;
@@ -48,6 +51,7 @@ namespace UI_Chat_App
             _friendRequests = new ObservableCollection<FriendRequestWithUserInfo>(); 
             _sentFriendRequests = new ObservableCollection<FriendRequestWithUserInfo>();
             _messages = new ObservableCollection<MessageData>(); // Khởi tạo danh sách tin nhắn
+            _notifications = new ObservableCollection<NotificationData>();
             Loaded += ChatWindow_Loaded;
             Closing += Window_Closing;
 
@@ -138,8 +142,9 @@ namespace UI_Chat_App
             await RefreshFriendsAndRequestsAsync();
             if (_selectedUser != null && !string.IsNullOrEmpty(_currentChatRoomId))
             {
-                await RefreshMessagesAsync();
+                await RefreshMessagesAsync();                
             }
+            await RefreshNotificationAsync();
         }
 
         private async Task RefreshFriendsAndRequestsAsync()
@@ -249,6 +254,58 @@ namespace UI_Chat_App
             // Đảm bảo danh sách đã được làm mới
             SentFriendRequestsListBox.ItemsSource = _sentFriendRequests;
         }
+        private async Task RefreshNotificationAsync()
+        {
+            Console.WriteLine($"[DEBUG] Start refresh notification is running");
+
+            try
+            {
+                var notifications = await _databaseService.GetNotificationsAsync(App.CurrentUser.Id);
+                if (notifications != null)
+                {
+                    // Kiểm tra và xử lý từng thông báo
+                    foreach (var notification in notifications)
+                    {
+                        // Đánh dấu thông báo là đã đọc nếu là từ người đang chat
+                        if (_selectedUser != null && !notification.IsRead && notification.From == _selectedUser.Id)
+                        {
+                            try
+                            {
+                                await _databaseService.MarkNotificationsAsReadAsync(App.CurrentUser.Id, notification.Id);
+                                Console.WriteLine($"Marked notification as read: {notification.Timestamp}");
+                                _notifications.Add(notification);
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Failed to mark notification as read: {ex.Message}");
+                            }
+                        }
+                    }
+
+                    // ✅ Cập nhật số lượng thông báo chưa đọc trên giao diện (không phụ thuộc vào _selectedUser)
+                    try
+                    {
+                        Console.WriteLine("Calling CountUnreadNotificationsAsync...");
+                        int unreadCount = await _databaseService.CountUnreadNotificationsAsync(App.CurrentUser.Id);
+                        Console.WriteLine($"Returned unread count = {unreadCount}");
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            NotificationCountText.Text = unreadCount.ToString();
+                            NotificationCountText.Visibility = unreadCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Failed to refresh notification count: " + ex.Message);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to refresh notifications: {ex.Message}");
+            }
+        }
+
 
         private async Task RefreshMessagesAsync()
         {
@@ -264,6 +321,7 @@ namespace UI_Chat_App
 
                         foreach (var message in messages)
                         {
+                            // Đánh dấu tin nhắn là "đã xem" nếu người nhận là người dùng hiện tại                          
                             if (!message.IsSeen && message.ReceiverId == App.CurrentUser.Id)
                             {
                                 message.IsSeen = true;
@@ -628,6 +686,7 @@ namespace UI_Chat_App
 
                 _currentChatRoomId = _databaseService.GenerateChatRoomId(App.CurrentUser.Id, _selectedUser.Id);
                 await RefreshMessagesAsync();
+                await RefreshNotificationAsync();
             }
             else
             {
@@ -653,6 +712,9 @@ namespace UI_Chat_App
             }
         }
 
+        
+
+
         private async Task SendMessageAsync()
         {
             if (_selectedUser == null)
@@ -676,8 +738,19 @@ namespace UI_Chat_App
                 };
 
                 await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
+                // 🔔 Gửi thông báo
+                try
+                {
+                    await _databaseService.SendNotificationAsync(_selectedUser.Id, App.CurrentUser.Id, messageContent);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Failed to send notification: {ex.Message}");
+                    // Có thể thông báo cho người dùng, nhưng không làm gián đoạn quy trình
+                }
                 await Dispatcher.InvokeAsync(() => MessageTextBox.Text = string.Empty);
                 await RefreshMessagesAsync();
+                await RefreshNotificationAsync();
             }
             catch (Exception ex)
             {
@@ -882,6 +955,8 @@ namespace UI_Chat_App
             NotificationPopup.IsOpen = !NotificationPopup.IsOpen;
         }
 
+
+
         private void MoreOptionsButton_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as Button;
@@ -978,6 +1053,7 @@ namespace UI_Chat_App
                     await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
                     AttachOptionsPanel.Visibility = Visibility.Collapsed;
                     await RefreshMessagesAsync();
+                    await RefreshNotificationAsync();
                 }
             }
             catch (Exception ex)
@@ -1027,6 +1103,7 @@ namespace UI_Chat_App
                     await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
                     AttachOptionsPanel.Visibility = Visibility.Collapsed;
                     await RefreshMessagesAsync();
+                    await RefreshNotificationAsync();
                 }
             }
             catch (Exception ex)
@@ -1082,6 +1159,7 @@ namespace UI_Chat_App
                 File.Delete(tempFilePath);
                 AttachOptionsPanel.Visibility = Visibility.Collapsed;
                 await RefreshMessagesAsync();
+                await RefreshNotificationAsync();
             }
             catch (Exception ex)
             {
@@ -1121,7 +1199,9 @@ namespace UI_Chat_App
 
                     await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
                     EmojiPopup.IsOpen = false;
+                    EmojiPanel.Visibility = Visibility.Collapsed;
                     await RefreshMessagesAsync();
+                    await RefreshNotificationAsync();
                 }
             }
             catch (Exception ex)
