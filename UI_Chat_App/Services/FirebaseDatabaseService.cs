@@ -97,7 +97,7 @@ namespace ChatApp.Services
             }
         }
 
-        public async Task<List<MessageData>> GetMessagesAsync(string chatRoomId)
+        public async Task<List<MessageData>> GetMessagesAsync(string chatRoomId, string lastTimestamp = null)
         {
             try
             {
@@ -105,12 +105,19 @@ namespace ChatApp.Services
                     .Collection("messages")
                     .Document(chatRoomId)
                     .Collection("messages");
-                QuerySnapshot snapshot = await messagesRef.OrderBy("Timestamp").GetSnapshotAsync();
+                Query query = messagesRef.OrderBy("Timestamp");
+
+                if (!string.IsNullOrEmpty(lastTimestamp))
+                {
+                    query = query.WhereGreaterThan("Timestamp", lastTimestamp);
+                }
+
+                QuerySnapshot snapshot = await query.GetSnapshotAsync();
                 var messages = snapshot.Documents
                     .Select(doc =>
                     {
                         var message = doc.ConvertTo<MessageData>();
-                        message.MessageId = doc.Id; // Gán MessageId từ ID của document
+                        message.MessageId = doc.Id;
                         return message;
                     })
                     .OrderBy(m => DateTime.Parse(m.Timestamp))
@@ -486,7 +493,7 @@ namespace ChatApp.Services
         }
 
 
-        
+
 
     }
 }

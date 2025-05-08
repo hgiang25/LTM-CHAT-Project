@@ -33,7 +33,9 @@ namespace UI_Chat_App
         private UserData _selectedUser;
         private string _currentChatRoomId;
         private string _idToken;
-        private DispatcherTimer _refreshTimer; // Timer duy nhất để polling
+        private DispatcherTimer _refreshTimer; // Timer cho bạn bè và lời mời
+        private DispatcherTimer _messageRefreshTimer; // Timer riêng cho tin nhắn
+        private string _lastMessageTimestamp; // Lưu thời gian tin nhắn cuối cùng
 
         // Thuộc tính công khai để truy cập _sentFriendRequests từ HasPendingRequestConverter
         public ObservableCollection<FriendRequestWithUserInfo> SentFriendRequests => _sentFriendRequests;
@@ -45,24 +47,33 @@ namespace UI_Chat_App
             _authService = new FirebaseAuthService();
             _users = new ObservableCollection<UserData>();
             _allUsers = new ObservableCollection<UserData>();
-            _friendRequests = new ObservableCollection<FriendRequestWithUserInfo>(); 
+            _friendRequests = new ObservableCollection<FriendRequestWithUserInfo>();
             _sentFriendRequests = new ObservableCollection<FriendRequestWithUserInfo>();
             _messages = new ObservableCollection<MessageData>(); // Khởi tạo danh sách tin nhắn
             Loaded += ChatWindow_Loaded;
             Closing += Window_Closing;
 
-            // Khởi tạo timer duy nhất
+            // Timer cho bạn bè và lời mời
             _refreshTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromSeconds(15) // Cập nhật mỗi 5 giây
+                Interval = TimeSpan.FromSeconds(15) // Cập nhật bạn bè/lời mời mỗi 60 giây
             };
-            _refreshTimer.Tick += RefreshTimer_Tick;
+            _refreshTimer.Tick += RefreshFriendsAndRequests_Tick;
+
+            // Timer riêng cho tin nhắn
+            _messageRefreshTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(3) // Cập nhật tin nhắn mỗi 5 giây
+            };
+            _messageRefreshTimer.Tick += MessageRefreshTimer_Tick;
         }
 
+        // Thay thế ChatWindow_Loaded
         private async void ChatWindow_Loaded(object sender, RoutedEventArgs e)
         {
             await InitializeChatAsync();
-            _refreshTimer.Start(); // Bắt đầu timer
+            _refreshTimer.Start();
+            _messageRefreshTimer.Start();
         }
 
         private async Task InitializeChatAsync()
@@ -132,10 +143,14 @@ namespace UI_Chat_App
             }
         }
 
-        private async void RefreshTimer_Tick(object sender, EventArgs e)
+        // Thêm hai hàm mới cho timer
+        private async void RefreshFriendsAndRequests_Tick(object sender, EventArgs e)
         {
-            // Làm mới danh sách bạn bè, lời mời, và tin nhắn
             await RefreshFriendsAndRequestsAsync();
+        }
+
+        private async void MessageRefreshTimer_Tick(object sender, EventArgs e)
+        {
             if (_selectedUser != null && !string.IsNullOrEmpty(_currentChatRoomId))
             {
                 await RefreshMessagesAsync();
@@ -153,7 +168,8 @@ namespace UI_Chat_App
                     await Dispatcher.InvokeAsync(() =>
                     {
                         var previouslySelectedUserId = _selectedUser?.Id;
-                        _users.Clear();
+                        // Tạo danh sách tạm để so sánh
+                        var newUsers = new ObservableCollection<UserData>();
                         foreach (var friend in friends)
                         {
                             if (string.IsNullOrEmpty(friend.Avatar))
@@ -165,14 +181,24 @@ namespace UI_Chat_App
                                         Console.WriteLine($"Failed to save default avatar for friend {friend.Id}: {t.Exception.Message}");
                                 });
                             }
-                            _users.Add(friend);
+                            newUsers.Add(friend);
                         }
 
-                        // Cập nhật người dùng đang chọn
+                        // Chỉ cập nhật _users nếu danh sách thay đổi
+                        if (!_users.SequenceEqual(newUsers, new UserDataComparer()))
+                        {
+                            _users.Clear();
+                            foreach (var user in newUsers)
+                            {
+                                _users.Add(user);
+                            }
+                        }
+
+                        // Cập nhật người dùng đang chọn mà không gây làm mới giao diện nhắn tin
                         if (previouslySelectedUserId != null)
                         {
                             var userToSelect = _users.FirstOrDefault(u => u.Id == previouslySelectedUserId);
-                            if (userToSelect != null)
+                            if (userToSelect != null && userToSelect != UserListBox.SelectedItem)
                             {
                                 UserListBox.SelectedItem = userToSelect;
                                 _selectedUser = userToSelect;
@@ -215,11 +241,7 @@ namespace UI_Chat_App
                 // Làm mới danh sách tất cả người dùng (chỉ hiển thị người chưa là bạn bè)
                 var usersDict = await _databaseService.GetAllUsersAsync(_idToken);
                 var allUsers = usersDict.Values.Where(u => u.Id != App.CurrentUser.Id).ToList();
-
-                // Lấy danh sách ID của bạn bè
                 var friendIds = friends?.Select(f => f.Id).ToList() ?? new List<string>();
-
-                // Lọc danh sách người dùng để chỉ giữ lại những người chưa là bạn bè
                 var nonFriends = allUsers.Where(u => !friendIds.Contains(u.Id)).ToList();
 
                 await Dispatcher.InvokeAsync(async () =>
@@ -235,12 +257,27 @@ namespace UI_Chat_App
                         _allUsers.Add(user);
                     }
                     AllUsersListBox.ItemsSource = null;
-                    AllUsersListBox.ItemsSource = _allUsers; // Làm mới giao diện
+                    AllUsersListBox.ItemsSource = _allUsers;
                 });
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Failed to refresh friends and requests: {ex.Message}");
+            }
+        }
+
+        // Thêm class UserDataComparer để so sánh danh sách bạn bè
+        private class UserDataComparer : IEqualityComparer<UserData>
+        {
+            public bool Equals(UserData x, UserData y)
+            {
+                if (x == null || y == null) return false;
+                return x.Id == y.Id && x.DisplayName == y.DisplayName && x.Email == y.Email && x.Avatar == y.Avatar && x.IsOnline == y.IsOnline;
+            }
+
+            public int GetHashCode(UserData obj)
+            {
+                return obj.Id.GetHashCode();
             }
         }
 
@@ -254,14 +291,11 @@ namespace UI_Chat_App
         {
             try
             {
-                var messages = await _databaseService.GetMessagesAsync(_currentChatRoomId);
-                if (messages != null)
+                var messages = await _databaseService.GetMessagesAsync(_currentChatRoomId, _lastMessageTimestamp);
+                if (messages != null && messages.Any())
                 {
                     await Dispatcher.InvokeAsync(() =>
                     {
-                        _messages.Clear();
-                        MessagesStackPanel.Children.Clear();
-
                         foreach (var message in messages)
                         {
                             if (!message.IsSeen && message.ReceiverId == App.CurrentUser.Id)
@@ -421,8 +455,6 @@ namespace UI_Chat_App
                                     continue;
                                 }
                             }
-
-
                             else
                             {
                                 var bubble = CreateMessageBubble(
@@ -435,6 +467,7 @@ namespace UI_Chat_App
                             }
                         }
 
+                        _lastMessageTimestamp = messages.Max(m => m.Timestamp);
                         MessagesScrollViewer.ScrollToEnd();
                     });
                 }
@@ -586,9 +619,12 @@ namespace UI_Chat_App
 
         private async void UserListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            _selectedUser = UserListBox.SelectedItem as UserData;
-            if (_selectedUser != null)
+            var newSelectedUser = UserListBox.SelectedItem as UserData;
+
+            // Chỉ làm mới nếu người dùng được chọn thay đổi
+            if (newSelectedUser != null && (newSelectedUser != _selectedUser || _currentChatRoomId == null))
             {
+                _selectedUser = newSelectedUser;
                 bool areFriends = await _databaseService.AreFriendsAsync(App.CurrentUser.Id, _selectedUser.Id);
                 if (!areFriends)
                 {
@@ -601,6 +637,8 @@ namespace UI_Chat_App
                     ProfileUsername.Text = "Username: [Username]";
                     ProfileEmail.Text = "Email: user@example.com";
                     ProfileStatus.Text = "Status: Offline";
+                    _currentChatRoomId = null;
+                    _lastMessageTimestamp = null;
                     return;
                 }
 
@@ -627,16 +665,22 @@ namespace UI_Chat_App
                 }
 
                 _currentChatRoomId = _databaseService.GenerateChatRoomId(App.CurrentUser.Id, _selectedUser.Id);
+                _lastMessageTimestamp = null;
+                _messages.Clear();
+                MessagesStackPanel.Children.Clear();
                 await RefreshMessagesAsync();
             }
-            else
+            else if (newSelectedUser == null)
             {
+                _selectedUser = null;
                 MessagesStackPanel.Children.Clear();
                 ChatWithTextBlock.Text = "Chat with [User]";
                 ProfileAvatar.Source = null;
                 ProfileUsername.Text = "Username: [Username]";
                 ProfileEmail.Text = "Email: user@example.com";
                 ProfileStatus.Text = "Status: Offline";
+                _currentChatRoomId = null;
+                _lastMessageTimestamp = null;
             }
         }
 
@@ -672,12 +716,26 @@ namespace UI_Chat_App
                     ReceiverId = _selectedUser.Id,
                     Content = messageContent,
                     Timestamp = DateTime.UtcNow.ToString("o"),
-                    MessageType = "Text"
+                    MessageType = "Text",
+                    IsSeen = false
                 };
 
                 await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
-                await Dispatcher.InvokeAsync(() => MessageTextBox.Text = string.Empty);
-                await RefreshMessagesAsync();
+
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    _messages.Add(message);
+                    var bubble = CreateMessageBubble(
+                        message.Content,
+                        DateTime.Parse(message.Timestamp).ToLocalTime().ToShortTimeString(),
+                        true,
+                        message.IsSeen
+                    );
+                    MessagesStackPanel.Children.Add(bubble);
+                    MessagesScrollViewer.ScrollToEnd();
+                    MessageTextBox.Text = string.Empty;
+                    _lastMessageTimestamp = message.Timestamp;
+                });
             }
             catch (Exception ex)
             {
@@ -690,7 +748,8 @@ namespace UI_Chat_App
             try
             {
                 _refreshTimer.Stop();
-                Console.WriteLine("Refresh timer stopped on window closing.");
+                _messageRefreshTimer.Stop();
+                Console.WriteLine("Timers stopped on window closing.");
 
                 if (App.CurrentUser != null)
                 {
@@ -895,7 +954,7 @@ namespace UI_Chat_App
         {
             // Chuyển sang tab Add Friends
             TabControl.SelectedIndex = 1;
-            
+
         }
 
         private void AddGroupsButton_Click(object sender, RoutedEventArgs e)
@@ -1275,7 +1334,7 @@ namespace UI_Chat_App
             }
         }
 
-       
+
 
         private void DeleteUserButton_Click(object sender, RoutedEventArgs e)
         {
