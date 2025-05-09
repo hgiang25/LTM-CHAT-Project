@@ -568,13 +568,17 @@ namespace ChatApp.Services
                     .Document(userId)
                     .Collection("items");
 
-                // Lấy tất cả thông báo
-                QuerySnapshot snapshot = await notifRef.GetSnapshotAsync();
+                //// Lấy tất cả thông báo
+                //QuerySnapshot snapshot = await notifRef.GetSnapshotAsync();
 
-                // Lọc các thông báo chưa đọc tại client
-                int unreadCount = snapshot.Documents
-                    .Select(doc => doc.ConvertTo<NotificationData>())
-                    .Count(n => n.IsRead == false);
+                //// Lọc các thông báo chưa đọc tại client
+                //int unreadCount = snapshot.Documents
+                //    .Select(doc => doc.ConvertTo<NotificationData>())
+                //    .Count(n => n.IsRead == false);
+                var query = notifRef.WhereEqualTo("IsRead", false);
+                var snapshot = await query.GetSnapshotAsync();
+                int unreadCount = snapshot.Count;
+
 
                 Console.WriteLine($"Found {unreadCount} unread notifications for user {userId}");
                 return unreadCount;
@@ -585,6 +589,38 @@ namespace ChatApp.Services
                 throw new Exception($"Failed to count unread notifications: {ex.Message}", ex);
             }
         }
+        private FirestoreChangeListener _notifListener;
+
+        public void StartListeningForNotifications(string userId, Action<NotificationData> onNewNotification)
+        {
+            var notifRef = _firestoreDb
+                .Collection("notifications")
+                .Document(userId)
+                .Collection("items");
+
+            _notifListener = notifRef.Listen(snapshot =>
+            {
+                foreach (var change in snapshot.Changes)
+                {
+                    if (change.ChangeType == Google.Cloud.Firestore.DocumentChange.Type.Added)
+                    {
+                        var notif = change.Document.ConvertTo<NotificationData>();
+                        onNewNotification?.Invoke(notif);
+                    }
+                }
+            });
+        }
+
+        public async Task StopListeningForNotificationsAsync()
+        {
+            if (_notifListener != null)
+            {
+                await _notifListener.StopAsync();
+                _notifListener = null;
+            }
+        }
+
+
 
     }
 }

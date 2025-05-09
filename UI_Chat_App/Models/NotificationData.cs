@@ -26,4 +26,11 @@ namespace ChatApp.Models
         [FirestoreProperty]
         public bool IsRead { get; set; }
     }
+    public class NotificationSummary
+    {
+        public string SenderId { get; set; }
+        public string SenderName { get; set; } // Nếu bạn có tên
+        public int UnreadCount { get; set; }
+    }
+
 }

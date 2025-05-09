@@ -126,6 +126,27 @@ namespace UI_Chat_App
                 FriendRequestsListBox.ItemsSource = _friendRequests;
                 AllUsersListBox.ItemsSource = _allUsers;
 
+                _databaseService.StartListeningForNotifications(App.CurrentUser.Id, notif =>
+                {
+                    Application.Current.Dispatcher.Invoke(async () =>
+                    {
+                        // Cập nhật danh sách UI hoặc thông báo
+                        _notifications.Add(notif);
+
+                        // Nếu là tin từ người đang chat, thì đánh dấu là đã đọc luôn
+                        if (_selectedUser != null && notif.From == _selectedUser.Id && !notif.IsRead)
+                        {
+                            await _databaseService.MarkNotificationsAsReadAsync(App.CurrentUser.Id, notif.Id);
+                        }
+
+                        // Cập nhật lại số lượng chưa đọc
+                        int unreadCount = await _databaseService.CountUnreadNotificationsAsync(App.CurrentUser.Id);
+                        NotificationCountText.Text = unreadCount.ToString();
+                        NotificationCountText.Visibility = unreadCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+                    });
+                });
+
+
                 // Tải dữ liệu ban đầu
                 await RefreshFriendsAndRequestsAsync();
                 await LoadAllUsersAsync();
@@ -776,6 +797,8 @@ namespace UI_Chat_App
                     await _databaseService.SaveUserAsync(App.IdToken, App.CurrentUser);
                     Console.WriteLine($"Set IsOnline = false for user {App.CurrentUser.Id} on window closing.");
                 }
+               await _databaseService.StopListeningForNotificationsAsync();
+
             }
             catch (Exception ex)
             {
@@ -949,10 +972,72 @@ namespace UI_Chat_App
             }
         }
 
-        private void NotificationButton_Click(object sender, RoutedEventArgs e)
+        private async void NotificationButton_Click(object sender, RoutedEventArgs e)
         {
             // Code xử lý khi nhấn nút thông báo
-            NotificationPopup.IsOpen = !NotificationPopup.IsOpen;
+            //NotificationPopup.IsOpen = !NotificationPopup.IsOpen;
+            NotificationPopup.IsOpen = true;
+            NotificationListPanel.Children.Clear();
+
+            // Lấy danh sách tất cả thông báo
+            var notifications = await _databaseService.GetNotificationsAsync(App.CurrentUser.Id);
+
+            // Gom nhóm theo người gửi và đếm số lượng chưa đọc
+            var grouped = notifications
+                .Where(n => !n.IsRead)
+                .GroupBy(n => n.From)
+                .Select(g => new NotificationSummary
+                {
+                    SenderId = g.Key,
+                    SenderName = GetUserNameById(g.Key), // Nếu bạn có thông tin tên
+                    UnreadCount = g.Count()
+                });
+
+            foreach (var item in grouped)
+            {
+                var button = new Button
+                {
+                    Content = $"{item.SenderName ?? item.SenderId}: {item.UnreadCount} tin nhắn",
+                    Margin = new Thickness(0, 5, 0, 5),
+                    Tag = item.SenderId,
+                    HorizontalAlignment = HorizontalAlignment.Stretch
+                };
+
+                button.Click += NotificationItem_Click;
+
+                NotificationListPanel.Children.Add(button);
+            }
+        }
+
+        private string GetUserNameById(string id)
+        {
+            // Nếu bạn có sẵn danh sách bạn bè
+            var user = _users.FirstOrDefault(f => f.Id == id);
+            return user?.DisplayName ?? id;
+        }
+        private async void NotificationItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button button && button.Tag is string senderId)
+            {
+                // Tìm user trong danh sách bạn
+                var targetUser = _users.FirstOrDefault(u => u.Id == senderId);
+                if (targetUser != null)
+                {
+                    UserListBox.SelectedItem = targetUser;
+
+                    // Đánh dấu các tin nhắn từ người đó là đã đọc
+                    var notifications = await _databaseService.GetNotificationsAsync(App.CurrentUser.Id);
+                    foreach (var notif in notifications.Where(n => n.From == senderId && !n.IsRead))
+                    {
+                        await _databaseService.MarkNotificationsAsReadAsync(App.CurrentUser.Id, notif.Id);
+                    }
+
+                    // Làm mới lại số lượng chưa đọc
+                    await RefreshNotificationAsync();
+                }
+
+                NotificationPopup.IsOpen = false;
+            }
         }
 
 
@@ -1199,7 +1284,7 @@ namespace UI_Chat_App
 
                     await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
                     EmojiPopup.IsOpen = false;
-                    EmojiPanel.Visibility = Visibility.Collapsed;
+                    //EmojiPanel.Visibility = Visibility.Collapsed;
                     await RefreshMessagesAsync();
                     await RefreshNotificationAsync();
                 }

@@ -356,6 +356,7 @@
                             <Image Source="Icons/search.png" Width="20" Height="20"/>
                         </Button>
                         <Button Width="30" Height="30"
+                        Grid.Column="2"
         Background="Transparent"
         BorderBrush="Transparent"
         Click="NotificationButton_Click"
@@ -393,7 +394,7 @@
             Padding="10"
             Width="250" Height="300">
 
-                                <StackPanel>
+                                <StackPanel  x:Name="NotificationListPanel">
                                     
                                 </StackPanel>
 
