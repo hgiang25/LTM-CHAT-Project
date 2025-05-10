@@ -829,8 +829,8 @@ namespace UI_Chat_App
                     Console.WriteLine($"Failed to send notification: {ex.Message}");
                     // Có thể thông báo cho người dùng, nhưng không làm gián đoạn quy trình
                 }
-                await Dispatcher.InvokeAsync(() => MessageTextBox.Text = string.Empty);
-                await RefreshMessagesAsync();
+                //await Dispatcher.InvokeAsync(() => MessageTextBox.Text = string.Empty);
+                //await RefreshMessagesAsync();
                 await RefreshNotificationAsync();
             }
             catch (Exception ex)
@@ -925,7 +925,7 @@ namespace UI_Chat_App
                     await _databaseService.SaveUserAsync(App.IdToken, App.CurrentUser);
                     Console.WriteLine($"Set IsOnline = false for user {App.CurrentUser.Id} on logout.");
                 }
-
+                await _databaseService.StopListeningForNotificationsAsync();
                 // Đóng cửa sổ hiện tại và mở lại cửa sổ đăng nhập
                 var mainWindow = new MainWindow(); // Đã sửa từ LoginWindow thành MainWindow
                 mainWindow.Show();
@@ -1198,6 +1198,16 @@ namespace UI_Chat_App
 
                     await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
                     AttachOptionsPanel.Visibility = Visibility.Collapsed;
+                    // 🔔 Gửi thông báo
+                    try
+                    {
+                        await _databaseService.SendNotificationAsync(_selectedUser.Id, App.CurrentUser.Id, "Image");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Failed to send notification: {ex.Message}");
+                        // Có thể thông báo cho người dùng, nhưng không làm gián đoạn quy trình
+                    }
                     await RefreshMessagesAsync();
                     await RefreshNotificationAsync();
                 }
@@ -1303,6 +1313,16 @@ namespace UI_Chat_App
 
                 await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
                 File.Delete(tempFilePath);
+                // 🔔 Gửi thông báo
+                try
+                {
+                    await _databaseService.SendNotificationAsync(_selectedUser.Id, App.CurrentUser.Id, "Voice");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Failed to send notification: {ex.Message}");
+                    // Có thể thông báo cho người dùng, nhưng không làm gián đoạn quy trình
+                }
                 AttachOptionsPanel.Visibility = Visibility.Collapsed;
                 await RefreshMessagesAsync();
                 await RefreshNotificationAsync();
@@ -1330,8 +1350,7 @@ namespace UI_Chat_App
             try
             {
                 var button = sender as Button;
-                string emojiKey = button?.Tag as string; // VD: "cuoi"
-
+                string emojiKey = button?.Tag as string; // VD: "cuoi"                
                 if (!string.IsNullOrEmpty(emojiKey))
                 {
                     var message = new MessageData
@@ -1345,6 +1364,16 @@ namespace UI_Chat_App
 
                     await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
                     EmojiPopup.IsOpen = false;
+                    // 🔔 Gửi thông báo
+                    try
+                    {
+                        await _databaseService.SendNotificationAsync(_selectedUser.Id, App.CurrentUser.Id, "Emoji");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Failed to send notification: {ex.Message}");
+                        // Có thể thông báo cho người dùng, nhưng không làm gián đoạn quy trình
+                    }
                     //EmojiPanel.Visibility = Visibility.Collapsed;
                     await RefreshMessagesAsync();
                     await RefreshNotificationAsync();
