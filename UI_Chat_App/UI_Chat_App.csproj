@@ -67,8 +67,8 @@
     <Reference Include="Google.Apis.Core, Version=1.68.0.0, Culture=neutral, PublicKeyToken=4b01fa6e34db77ab, processorArchitecture=MSIL">
       <HintPath>..\packages\Google.Apis.Core.1.68.0\lib\net462\Google.Apis.Core.dll</HintPath>
     </Reference>
-    <Reference Include="Google.Cloud.Firestore, Version=3.7.0.0, Culture=neutral, PublicKeyToken=185c282632e132a0, processorArchitecture=MSIL">
-      <HintPath>..\packages\Google.Cloud.Firestore.3.7.0\lib\net462\Google.Cloud.Firestore.dll</HintPath>
+    <Reference Include="Google.Cloud.Firestore, Version=3.10.0.0, Culture=neutral, PublicKeyToken=185c282632e132a0, processorArchitecture=MSIL">
+      <HintPath>..\packages\Google.Cloud.Firestore.3.10.0\lib\net462\Google.Cloud.Firestore.dll</HintPath>
     </Reference>
     <Reference Include="Google.Cloud.Firestore.V1, Version=3.10.0.0, Culture=neutral, PublicKeyToken=185c282632e132a0, processorArchitecture=MSIL">
       <HintPath>..\packages\Google.Cloud.Firestore.V1.3.10.0\lib\net462\Google.Cloud.Firestore.V1.dll</HintPath>
