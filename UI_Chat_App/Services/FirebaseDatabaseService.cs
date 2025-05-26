@@ -624,6 +624,50 @@ namespace ChatApp.Services
             }
         }
 
+        public async Task SetTypingStatusAsync(string senderId, string receiverId, bool isTyping)
+        {
+            try
+            {
+                var typingRef = _firestoreDb
+                    .Collection("typingStatus")
+                    .Document(receiverId)
+                    .Collection("users")
+                    .Document(senderId);
+
+                var data = new Dictionary<string, object>
+        {
+            { "isTyping", isTyping },
+            { "timestamp", Timestamp.GetCurrentTimestamp() }
+        };
+
+                await typingRef.SetAsync(data);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to set typing status: {ex.Message}");
+            }
+        }
+
+        public FirestoreChangeListener ListenToTypingStatus(string receiverId, string senderId, Action<bool> onTypingStatusChanged)
+        {
+            string docPath = $"typingStatus/{receiverId}/users/{senderId}";
+            DocumentReference docRef = _firestoreDb.Document(docPath);
+
+            return docRef.Listen(snapshot =>
+            {
+                if (snapshot.Exists && snapshot.TryGetValue("isTyping", out bool isTyping))
+                {
+                    onTypingStatusChanged(isTyping);
+                }
+                else
+                {
+                    onTypingStatusChanged(false);
+                }
+            });
+        }
+
+
+
 
 
     }

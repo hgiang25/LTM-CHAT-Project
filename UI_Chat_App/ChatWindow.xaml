@@ -695,7 +695,14 @@
                                 <Image Source="Icons/voice_record.png" Width="20" Height="20" RenderTransformOrigin="1,1"/>
                             </Button>
                         </StackPanel>
-                        <TextBox x:Name="MessageTextBox" Grid.Column="1" Style="{StaticResource MessageTextBoxStyle}" KeyDown="MessageTextBox_KeyDown"/>
+                        <TextBox x:Name="MessageTextBox" Grid.Column="1" Style="{StaticResource MessageTextBoxStyle}" KeyDown="MessageTextBox_KeyDown" TextChanged="MessageTextBox_TextChanged"/>
+                        <TextBlock x:Name="TypingStatusTextBlock"
+                           Text=""
+                           Visibility="Collapsed"
+                           Foreground="Gray"
+                           FontStyle="Italic"
+                           Margin="10,0,10,10"/>    
+
                         <UniformGrid Grid.Column="2" Columns="2" HorizontalAlignment="Right" VerticalAlignment="Center">
                             <!-- Nút Like -->
                             <Button x:Name="LikeButton" Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="LikeButton_Click" Style="{StaticResource WindowButtonStyle}">
