@@ -129,31 +129,49 @@
     </Style>
     <!-- Style cho TextBox bo tròn -->
     <Style x:Key="RoundedTextBoxStyle" TargetType="TextBox">
-        <Setter Property="Control.Template">
+        <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
-                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="10">
-                        <ScrollViewer x:Name="PART_ContentHost"/>
+                    <Border Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10">
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                  VerticalAlignment="Center"
+                                  Margin="10,0"/>
                     </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
-        <Setter Property="TextAlignment" Value="Left"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
-        <Setter Property="Padding" Value="10,0"/>
+        <Setter Property="Padding" Value="0"/>
     </Style>
+
     <!-- Style cho PasswordBox bo tròn -->
     <Style x:Key="RoundedPasswordBoxStyle" TargetType="PasswordBox">
-        <Setter Property="Control.Template">
+        <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="PasswordBox">
-                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="10">
-                        <ScrollViewer x:Name="PART_ContentHost"/>
+                    <Border Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10">
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                  VerticalAlignment="Center"
+                                  Margin="10,0"/>
                     </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
-        <Setter Property="Padding" Value="10,0"/>
+        <Setter Property="Padding" Value="0"/>
     </Style>
+
+
+    <DropShadowEffect x:Key="DropShadow" 
+              Color="#000000" 
+              Direction="270" 
+              ShadowDepth="0" 
+              BlurRadius="20" 
+              Opacity="0.25"/>
 </ResourceDictionary>
