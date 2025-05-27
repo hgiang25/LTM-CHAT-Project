@@ -5,8 +5,10 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:UI_Chat_App"
         mc:Ignorable="d"
-        WindowStartupLocation="CenterScreen" 
-        Title="Login" Height="500" Width="800" Background="Transparent" WindowStyle="None" AllowsTransparency="True">
+        WindowStartupLocation="CenterScreen"
+        Title="Login" Height="540" Width="800"
+        Background="Transparent" WindowStyle="None" AllowsTransparency="True">
+
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -15,76 +17,102 @@
         </ResourceDictionary>
     </Window.Resources>
 
-    <Border CornerRadius="40" BorderBrush="#BDC3C7" BorderThickness="2">
+    <Border CornerRadius="40" BorderBrush="#BDC3C7" BorderThickness="1">
         <Border.Background>
             <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                <GradientStop Color="#3498DB" Offset="0.0"/>
-                <GradientStop Color="#2ECC71" Offset="1.0"/>
+                <GradientStop Color="#1CB5E0" Offset="0.0"/>
+                <GradientStop Color="#000851" Offset="1.0"/>
             </LinearGradientBrush>
         </Border.Background>
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
 
-            <!-- Các nút điều khiển cửa sổ -->
+        <Grid>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10">
-                <Button FontSize="30" Content="-" Width="30" Height="30" Click="MinimizeButton_Click" Style="{StaticResource WindowButtonStyle}"/>
-                <Button FontSize="25" Content="⛶" Width="30" Height="30" Click="MaximizeButton_Click" Style="{StaticResource WindowButtonStyle}"/>
-                <Button FontSize="20" Content="✖" Width="30" Height="30" Click="CloseButton_Click" Style="{StaticResource CloseButtonStyle}"/>
+                <Button FontSize="16" Content="_" Width="30" Height="30" Click="MinimizeButton_Click" Style="{StaticResource WindowButtonStyle}"/>
+                <Button FontSize="16" Content="🗖" Width="30" Height="30" Click="MaximizeButton_Click" Style="{StaticResource WindowButtonStyle}"/>
+                <Button FontSize="16" Content="✖" Width="30" Height="30" Click="CloseButton_Click" Style="{StaticResource CloseButtonStyle}"/>
             </StackPanel>
 
-            <!-- Grid chính chứa nội dung đăng nhập và đăng ký -->
-            <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Grid.Row="1" Margin="0,0,0,20">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+            <Border x:Name="LoginForm" Width="400" Height="440" Background="White" CornerRadius="20" Padding="30"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" Effect="{StaticResource DropShadow}"
+                    RenderTransformOrigin="0.5,0.5">
+                <Border.RenderTransform>
+                    <TranslateTransform X="0" Y="50"/>
+                </Border.RenderTransform>
 
-                <!-- Tiêu đề chào mừng -->
-                <TextBlock x:Name="TitleTextBlock" Text="Welcome Back!" Foreground="#FFFFFF" FontSize="36" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Grid.Row="0" Margin="0,20,0,10"/>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Welcome Back!" FontSize="26" FontWeight="Bold" Foreground="#2C3E50" HorizontalAlignment="Center" Margin="0,0,0,30"/>
 
-                <!-- Grid chứa các thành phần đăng nhập -->
-                <Grid x:Name="LoginGrid" Grid.Row="1" Visibility="Visible">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <!-- TextBox nhập tên người dùng -->
-                    <Grid Margin="0,10">
+                    <!-- Username with icon -->
+                    <StackPanel Margin="0,0,0,15">
+                        <TextBlock Text="Email" Margin="5,0,0,3" Foreground="Gray" FontSize="13"/>
                         <Grid>
-                            <TextBox x:Name="UsernameTextBox" Width="300" Height="50" Padding="10,0" FontSize="14" Background="#FFFFFF" Foreground="#2C3E50" BorderBrush="#BDC3C7" Style="{StaticResource RoundedTextBoxStyle}" Text="" GotFocus="TextBox_GotFocus" LostFocus="TextBox_LostFocus"/>
-                            <TextBlock x:Name="UsernamePlaceholder" Text="Email" Foreground="Gray" VerticalAlignment="Center" Margin="15,0" IsHitTestVisible="False"/>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="30"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Image Source="Icons/user_login.png" Width="16" Height="16" Margin="7,0" VerticalAlignment="Center" Grid.Column="0"/>
+                            <TextBox x:Name="UsernameTextBox" Grid.Column="1" Height="40" FontSize="14" Style="{StaticResource RoundedTextBoxStyle}" GotFocus="TextBox_GotFocus" LostFocus="TextBox_LostFocus"/>
                         </Grid>
-                    </Grid>
-                    <!-- PasswordBox nhập mật khẩu -->
-                    <Grid Margin="0,10" Grid.Row="1">
+                        <TextBlock x:Name="UsernamePlaceholder" Text="" Visibility="Collapsed"/>
+                    </StackPanel>
+
+                    <!-- Password with lock icon (left) and toggle icon in box (right) -->
+                    <StackPanel Margin="0,0,0,15">
+                        <TextBlock Text="Password" Margin="5,0,0,3" Foreground="Gray" FontSize="13"/>
                         <Grid>
-                            <PasswordBox x:Name="PasswordBox" Width="300" Height="50" Padding="10,0" FontSize="14" Background="#FFFFFF" Foreground="#2C3E50" BorderBrush="#BDC3C7" Style="{StaticResource RoundedPasswordBoxStyle}" PasswordChanged="PasswordBox_PasswordChanged" GotFocus="PasswordBox_GotFocus" LostFocus="PasswordBox_LostFocus"/>
-                            <TextBlock x:Name="PasswordPlaceholder" Text="Password" Foreground="Gray" VerticalAlignment="Center" Margin="15,0" IsHitTestVisible="False"/>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="30"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="40"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Lock icon (left) -->
+                            <Image Source="Icons/lock.png" Width="16" Height="16" Margin="7,0" VerticalAlignment="Center" Grid.Column="0"/>
+
+                            <!-- Password and visible textbox overlay -->
+                            <Grid Grid.Column="1">
+                                <PasswordBox x:Name="PasswordBox" Height="40" FontSize="14"
+                                             Style="{StaticResource RoundedPasswordBoxStyle}"
+                                             GotFocus="PasswordBox_GotFocus"
+                                             LostFocus="PasswordBox_LostFocus"
+                                             PasswordChanged="PasswordBox_PasswordChanged"
+                                             Padding="5,0"
+                                             Visibility="Visible"/>
+
+                                <TextBox x:Name="VisiblePasswordBox" Height="40" FontSize="14"
+                                         Style="{StaticResource RoundedTextBoxStyle}"
+                                         Padding="5,0"
+                                         IsReadOnly="True"
+                                         Visibility="Collapsed"/>
+                            </Grid>
+
+                            <!-- Toggle icon inside square box (right) -->
+                            <Border Grid.Column="2" Background="White" BorderBrush="#ccc" BorderThickness="1" CornerRadius="10" Margin="5,0,0,0" HorizontalAlignment="Right" Width="35" Height="40">
+                                <Image x:Name="PasswordToggleIcon"
+                                       Source="Icons/hide.png"
+                                       Width="16" Height="16"
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       Cursor="Hand"
+                                       MouseLeftButtonUp="TogglePasswordVisibility"/>
+                            </Border>
                         </Grid>
-                    </Grid>
+                        <TextBlock x:Name="PasswordPlaceholder" Text="" Visibility="Collapsed"/>
+                    </StackPanel>
 
-                    <!-- TextBlock hiển thị thông báo lỗi -->
-                    <TextBlock x:Name="ErrorMessageTextBlock" Foreground="Red" Visibility="Collapsed" Margin="10" Grid.Row="2" HorizontalAlignment="Left"/>
+                    <TextBlock x:Name="ErrorMessageTextBlock" Foreground="Red" Visibility="Collapsed" Margin="5,0,0,10" FontSize="12"/>
 
-                    <!-- Nút đăng nhập -->
-                    <Button Width="300" Height="50" Content="Login" Margin="0,10" Click="LoginButton_Click" Grid.Row="3"  Style="{StaticResource RoundedButtonStyle}"/>
+                    <Button Height="45" Content="Login" Click="LoginButton_Click" Style="{StaticResource RoundedButtonStyle}"/>
 
-                    <!-- TextBlock quên mật khẩu -->
-                    <TextBlock Text="Forgot Password?" Foreground="#FFFFFF" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" Grid.Row="4" Cursor="Hand" MouseLeftButtonUp="ForgotPasswordTextBlock_MouseLeftButtonUp" MouseEnter="TextBlock_MouseEnter" MouseLeave="TextBlock_MouseLeave"/>
+                    <TextBlock Text="Forgot Password?" Foreground="#3498DB" Margin="0,10,0,0" FontSize="13" HorizontalAlignment="Center" Cursor="Hand"
+                               MouseLeftButtonUp="ForgotPasswordTextBlock_MouseLeftButtonUp"
+                               MouseEnter="TextBlock_MouseEnter" MouseLeave="TextBlock_MouseLeave"/>
 
-                    <!-- TextBlock đăng ký tài khoản mới -->
-                    <TextBlock Text="Don't have an account? Sign Up" Foreground="#FFFFFF" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" Grid.Row="5" Cursor="Hand" MouseLeftButtonUp="SignUpTextBlock_MouseLeftButtonUp" MouseEnter="TextBlock_MouseEnter" MouseLeave="TextBlock_MouseLeave"/>
-                </Grid>
-            </Grid>
-
+                    <TextBlock Text="Don't have an account? Sign Up" Foreground="#3498DB" Margin="0,5,0,0" FontSize="13" HorizontalAlignment="Center" Cursor="Hand"
+                               MouseLeftButtonUp="SignUpTextBlock_MouseLeftButtonUp"
+                               MouseEnter="TextBlock_MouseEnter" MouseLeave="TextBlock_MouseLeave"/>
+                </StackPanel>
+            </Border>
         </Grid>
     </Border>
 </Window>

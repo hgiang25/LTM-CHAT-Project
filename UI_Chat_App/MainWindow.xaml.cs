@@ -2,6 +2,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media.Imaging;
 using ChatApp.Services;
 
 namespace UI_Chat_App
@@ -216,6 +217,27 @@ namespace UI_Chat_App
             {
                 ErrorMessageTextBlock.Text = ex.Message;
                 ErrorMessageTextBlock.Visibility = Visibility.Visible;
+            }
+        }
+
+        private bool isPasswordVisible = false;
+
+        private void TogglePasswordVisibility(object sender, MouseButtonEventArgs e)
+        {
+            isPasswordVisible = !isPasswordVisible;
+
+            if (isPasswordVisible)
+            {
+                VisiblePasswordBox.Text = PasswordBox.Password;
+                PasswordBox.Visibility = Visibility.Collapsed;
+                VisiblePasswordBox.Visibility = Visibility.Visible;
+                PasswordToggleIcon.Source = new BitmapImage(new Uri("Icons/see.png", UriKind.Relative));
+            }
+            else
+            {
+                PasswordBox.Visibility = Visibility.Visible;
+                VisiblePasswordBox.Visibility = Visibility.Collapsed;
+                PasswordToggleIcon.Source = new BitmapImage(new Uri("Icons/hide.png", UriKind.Relative));
             }
         }
     }
