@@ -2,6 +2,8 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media.Animation;
+using System.Windows.Media;
 using ChatApp.Services;
 
 namespace UI_Chat_App
@@ -13,6 +15,23 @@ namespace UI_Chat_App
         public SignUp()
         {
             InitializeComponent();
+            this.Opacity = 0;
+            this.Loaded += (s, e) =>
+            {
+                var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromSeconds(0.5));
+                this.BeginAnimation(Window.OpacityProperty, fadeIn);
+
+                var slide = new DoubleAnimation
+                {
+                    From = 50,
+                    To = 0,
+                    Duration = TimeSpan.FromSeconds(0.5),
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                };
+                (SignUpForm.RenderTransform as TranslateTransform)?.BeginAnimation(TranslateTransform.YProperty, slide);
+            };
+
+
             _authService = new FirebaseAuthService();
         }
 

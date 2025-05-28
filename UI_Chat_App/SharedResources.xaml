@@ -80,7 +80,7 @@
     </Style>
     <!-- Style cho nút đóng cửa sổ -->
     <Style x:Key="CloseButtonStyle" TargetType="Button" BasedOn="{StaticResource WindowButtonStyle}">
-        <Setter Property="Foreground" Value="#c41e3a"/>
+        <Setter Property="Foreground" Value="Red"/>
     </Style>
     <!-- Style cho các nút bo tròn -->
     <Style x:Key="RoundedButtonStyle" TargetType="Button">

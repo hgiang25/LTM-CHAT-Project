@@ -18,7 +18,7 @@ namespace ChatApp.Models
         public string Content { get; set; }
 
         [FirestoreProperty]
-        public string Timestamp { get; set; }
+        public Timestamp? Timestamp { get; set; }
 
         [FirestoreProperty]
         public string MessageType { get; set; } // "Text", "Image", "File", "Voice"
@@ -36,5 +36,6 @@ namespace ChatApp.Models
         public MessageData()
         {
         }
+
     }
 }

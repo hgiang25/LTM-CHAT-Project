@@ -89,6 +89,7 @@ namespace ChatApp.Services
                     .Collection("messages");
                 var docRef = await messagesRef.AddAsync(message);
                 message.MessageId = docRef.Id; // Gán MessageId từ ID của document
+                message.Timestamp = Timestamp.GetCurrentTimestamp(); // nếu chưa được gán từ trước
                 await docRef.SetAsync(message, SetOptions.Overwrite); // Cập nhật lại document với MessageId
                 Console.WriteLine($"Saved message with ID {message.MessageId} to chat room {chatRoomId}");
             }
@@ -98,39 +99,76 @@ namespace ChatApp.Services
             }
         }
 
-        public async Task<List<MessageData>> GetMessagesAsync(string chatRoomId, string lastTimestamp = null)
+        public async Task<List<MessageData>> GetMessagesAsync(string chatRoomId, Timestamp? lastTimestamp = null)
         {
             try
             {
-                CollectionReference messagesRef = _firestoreDb
+                var messagesRef = _firestoreDb
                     .Collection("messages")
                     .Document(chatRoomId)
                     .Collection("messages");
+
                 Query query = messagesRef.OrderBy("Timestamp");
 
-                if (!string.IsNullOrEmpty(lastTimestamp))
+                if (lastTimestamp != null)
                 {
                     query = query.WhereGreaterThan("Timestamp", lastTimestamp);
                 }
 
-                QuerySnapshot snapshot = await query.GetSnapshotAsync();
+                var snapshot = await query.GetSnapshotAsync();
                 var messages = snapshot.Documents
-                    .Select(doc =>
+                .Select(doc =>
+                {
+                    var dict = doc.ToDictionary();
+
+                    var message = new MessageData();
+                    message.MessageId = doc.Id;
+
+                    // Lấy các trường cơ bản
+                    if (dict.TryGetValue("SenderId", out var senderId)) message.SenderId = senderId as string;
+                    if (dict.TryGetValue("ReceiverId", out var receiverId)) message.ReceiverId = receiverId as string;
+                    if (dict.TryGetValue("Content", out var content)) message.Content = content as string;
+                    if (dict.TryGetValue("MessageType", out var messageType)) message.MessageType = messageType as string;
+                    if (dict.TryGetValue("IsSeen", out var isSeen)) message.IsSeen = (bool)isSeen;
+
+                    // Xử lý trường Timestamp
+                    if (dict.TryGetValue("Timestamp", out var timestampObj))
                     {
-                        var message = doc.ConvertTo<MessageData>();
-                        message.MessageId = doc.Id;
-                        return message;
-                    })
-                    .OrderBy(m => DateTime.Parse(m.Timestamp))
-                    .ToList();
-                Console.WriteLine($"Loaded {messages.Count} messages for chat room {chatRoomId}");
+                        if (timestampObj is string tsString)
+                        {
+                            // Chuyển string sang DateTime rồi sang Timestamp
+                            var dt = DateTime.Parse(tsString).ToUniversalTime();
+                            message.Timestamp = Google.Cloud.Firestore.Timestamp.FromDateTime(dt);
+                        }
+                        else if (timestampObj is Google.Cloud.Firestore.Timestamp ts)
+                        {
+                            message.Timestamp = ts;
+                        }
+                        else
+                        {
+                            // Trường hợp khác (nếu có)
+                            message.Timestamp = null; // hoặc xử lý phù hợp
+                        }
+                    }
+                    else
+                    {
+                        message.Timestamp = null; // Hoặc default value
+                    }
+
+                    return message;
+                })
+                .OrderBy(m => m.Timestamp?.ToDateTime() ?? DateTime.MinValue)
+                .ToList();
+
+
                 return messages;
             }
             catch (Exception ex)
             {
-                throw new Exception($"Failed to get messages for chat room {chatRoomId}: {ex.Message}", ex);
+                throw new Exception($"Failed to get messages: {ex.Message}", ex);
             }
         }
+
 
         public async Task MarkMessageAsSeenAsync(string chatRoomId, string messageId)
         {
@@ -666,8 +704,116 @@ namespace ChatApp.Services
             });
         }
 
+        private FirestoreChangeListener _messageListener;
+
+        //public async Task StartListeningToMessagesAsync(string chatRoomId, Timestamp? lastTimestamp, Action<MessageData> onMessageReceived)
+        //{
+        //    if (_messageListener != null)
+        //    {
+        //        await _messageListener.StopAsync();
+        //        _messageListener = null;
+        //    }
+
+        //    var messagesRef = _firestoreDb
+        //        .Collection("messages")
+        //        .Document(chatRoomId)
+        //        .Collection("messages");
+
+        //    Query query = messagesRef.OrderBy("Timestamp");
+
+        //    if (lastTimestamp != null)
+        //    {
+        //        query = query.WhereGreaterThan("Timestamp", lastTimestamp);
+        //    }
+
+        //    _messageListener = query.Listen(snapshot =>
+        //    {
+        //        foreach (var docChange in snapshot.Changes)
+        //        {
+        //            if (docChange.ChangeType == Google.Cloud.Firestore.DocumentChange.Type.Added)
+        //            {
+        //                var message = docChange.Document.ConvertTo<MessageData>();
+        //                onMessageReceived?.Invoke(message);
+        //            }
+        //        }
+        //    });
+        //}
+
+        public async Task StartListeningToMessagesAsync(string chatRoomId, Action<MessageData> onMessageReceived)
+        {
+            if (_messageListener != null)
+            {
+                await _messageListener.StopAsync();
+                _messageListener = null;
+            }
+
+            var messagesRef = _firestoreDb
+                .Collection("messages")
+                .Document(chatRoomId)
+                .Collection("messages");
+
+            var query = messagesRef.OrderBy("Timestamp");
+
+            _messageListener = query.Listen(snapshot =>
+            {
+                foreach (var docChange in snapshot.Changes)
+                {
+                    if (docChange.ChangeType == Google.Cloud.Firestore.DocumentChange.Type.Added)
+                    {
+                        var dict = docChange.Document.ToDictionary();
+                        var message = new MessageData();
+                        message.MessageId = docChange.Document.Id;
+
+                        // Các trường cơ bản
+                        if (dict.ContainsKey("SenderId")) message.SenderId = dict["SenderId"] as string;
+                        if (dict.ContainsKey("ReceiverId")) message.ReceiverId = dict["ReceiverId"] as string;
+                        if (dict.ContainsKey("Content")) message.Content = dict["Content"] as string;
+                        if (dict.ContainsKey("MessageType")) message.MessageType = dict["MessageType"] as string;
+                        if (dict.ContainsKey("IsSeen") && dict["IsSeen"] is bool seen) message.IsSeen = seen;
+
+                        // Xử lý Timestamp giống hệt GetMessagesAsync
+                        if (dict.ContainsKey("Timestamp"))
+                        {
+                            var tsObj = dict["Timestamp"];
+                            if (tsObj is string tsString)
+                            {
+                                DateTime dt;
+                                if (DateTime.TryParse(tsString, out dt))
+                                {
+                                    message.Timestamp = Timestamp.FromDateTime(dt.ToUniversalTime());
+                                }
+                            }
+                            else if (tsObj is Timestamp ts)
+                            {
+                                message.Timestamp = ts;
+                            }
+                            else
+                            {
+                                message.Timestamp = null;
+                            }
+                        }
+                        else
+                        {
+                            message.Timestamp = null;
+                        }
+
+                        onMessageReceived?.Invoke(message);
+                    }
+                }
+            });
+        }
 
 
+
+
+        public async Task StopListeningToMessagesAsync()
+        {
+            if (_messageListener != null)
+            {
+                await _messageListener.StopAsync();
+                _messageListener = null;
+            }
+        }
 
 
     }
