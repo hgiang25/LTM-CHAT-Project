@@ -79,11 +79,16 @@
                                              Padding="5,0"
                                              Visibility="Visible"/>
 
-                                <TextBox x:Name="VisiblePasswordBox" Height="40" FontSize="14"
-                                         Style="{StaticResource RoundedTextBoxStyle}"
-                                         Padding="5,0"
-                                         IsReadOnly="True"
-                                         Visibility="Collapsed"/>
+                                <TextBox x:Name="VisiblePasswordBox"
+         Visibility="Collapsed"
+         IsReadOnly="False"
+         Focusable="True"
+         AcceptsReturn="False"
+         VerticalContentAlignment="Center"
+         FontSize="16"
+         Margin="0"
+         Padding="5"/>
+
                             </Grid>
 
                             <!-- Toggle icon inside square box (right) -->

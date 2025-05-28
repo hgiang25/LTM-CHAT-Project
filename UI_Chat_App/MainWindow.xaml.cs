@@ -250,6 +250,7 @@ namespace UI_Chat_App
                 PasswordBox.Visibility = Visibility.Collapsed;
                 VisiblePasswordBox.Visibility = Visibility.Visible;
                 PasswordToggleIcon.Source = new BitmapImage(new Uri("Icons/see.png", UriKind.Relative));
+                VisiblePasswordBox.Focus();
             }
             else
             {
