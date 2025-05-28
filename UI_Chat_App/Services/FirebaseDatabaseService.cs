@@ -816,5 +816,108 @@ namespace ChatApp.Services
         }
 
 
+    //    public async Task<string> CreateGroupAsync(string groupName, string creatorId)
+    //    {
+    //        var groupId = Guid.NewGuid().ToString();
+
+    //        var groupRef = _firestoreDb.Collection("groups").Document(groupId);
+    //        var groupData = new Dictionary<string, object>
+    //{
+    //    { "name", groupName },
+    //    { "createdBy", creatorId },
+    //    { "createdAt", Timestamp.GetCurrentTimestamp() },
+    //    { "members", new Dictionary<string, object> { { creatorId, "admin" } } }
+    //};
+
+    //        await groupRef.SetAsync(groupData);
+    //        return groupId;
+    //    }
+
+    //    public async Task ApproveMemberAsync(string groupId, string userId)
+    //    {
+    //        var memberRef = _firestoreDb.Collection("groups").Document(groupId);
+    //        var updates = new Dictionary<string, object>
+    //{
+    //    { $"members.{userId}", "member" }
+    //};
+    //        await memberRef.UpdateAsync(updates);
+    //    }
+
+    //    public async Task RemoveMemberAsync(string groupId, string userId)
+    //    {
+    //        var groupRef = _firestoreDb.Collection("groups").Document(groupId);
+    //        var updates = new Dictionary<FieldPath, object>
+    //{
+    //    { new FieldPath("members", userId), FieldValue.Delete }
+    //};
+    //        await groupRef.UpdateAsync(updates);
+    //    }
+
+
+    //    public async Task<List<GroupData>> SearchGroupsByNameAsync(string keyword)
+    //    {
+    //        var groupsRef = _firestoreDb.Collection("groups");
+    //        var query = await groupsRef
+    //            .WhereGreaterThanOrEqualTo("name", keyword)
+    //            .WhereLessThanOrEqualTo("name", keyword + "\uf8ff")
+    //            .GetSnapshotAsync();
+
+    //        var results = new List<GroupData>();
+    //        foreach (var doc in query.Documents)
+    //        {
+    //            var dict = doc.ToDictionary();
+    //            results.Add(new GroupData
+    //            {
+    //                GroupId = doc.Id,
+    //                Name = dict["name"] as string,
+    //                CreatedBy = dict["createdBy"] as string,
+    //                CreatedAt = dict.ContainsKey("createdAt") && dict["createdAt"] is Timestamp ts ? ts : default,
+    //                Members = dict.ContainsKey("members") ? ((Dictionary<string, object>)dict["members"])
+    //                    .ToDictionary(kv => kv.Key, kv => kv.Value.ToString()) : new Dictionary<string, string>()
+    //            });
+    //        }
+
+    //        return results;
+    //    }
+
+    //    public async Task SendGroupMessageAsync(string groupId, MessageData message)
+    //    {
+    //        var messagesRef = _firestoreDb.Collection("groups").Document(groupId).Collection("messages");
+    //        var docRef = messagesRef.Document();
+    //        message.MessageId = docRef.Id;
+    //        message.Timestamp = Timestamp.GetCurrentTimestamp();
+
+    //        await docRef.SetAsync(message);
+    //    }
+
+    //    private FirestoreChangeListener _groupMessageListener;
+
+    //    public async Task StartListeningToGroupMessagesAsync(string groupId, Action<MessageData> onMessageReceived)
+    //    {
+    //        if (_groupMessageListener != null)
+    //        {
+    //            await _groupMessageListener.StopAsync();
+    //            _groupMessageListener = null;
+    //        }
+
+    //        var messagesRef = _firestoreDb.Collection("groups").Document(groupId).Collection("messages")
+    //            .OrderBy("Timestamp");
+
+    //        _groupMessageListener = messagesRef.Listen(snapshot =>
+    //        {
+    //            foreach (var change in snapshot.Changes)
+    //            {
+    //                if (change.ChangeType == Google.Cloud.Firestore.DocumentChange.Type.Added)
+    //                {
+    //                    var message = change.Document.ConvertTo<MessageData>();
+    //                    onMessageReceived?.Invoke(message);
+    //                }
+    //            }
+    //        });
+    //    }
+
+    //    public FirestoreDb GetDb() => _firestoreDb;
+
+
     }
 }

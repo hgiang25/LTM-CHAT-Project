@@ -350,6 +350,7 @@
     <Compile Include="Models\FriendData.cs" />
     <Compile Include="Models\FriendRequest.cs" />
     <Compile Include="Models\FriendRequestWithUserInfo.cs" />
+    <Compile Include="Models\GroupData.cs" />
     <Compile Include="Models\MessageData.cs" />
     <Compile Include="Models\NotificationData.cs" />
     <Compile Include="Models\UserData.cs" />

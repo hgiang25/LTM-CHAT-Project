@@ -413,7 +413,9 @@
                             <Image Source="Icons/add_groups.png" Width="20" Height="20"/>
                         </Button>
                     </Grid>
-
+                    
+                    
+                    
                     <!-- TabControl cho danh sách bạn bè và thêm bạn -->
                     <TabControl x:Name="TabControl" Grid.Row="1" SelectionChanged="TabControl_SelectionChanged">
                         <TabItem>

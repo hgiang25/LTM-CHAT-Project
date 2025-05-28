@@ -20,6 +20,7 @@ using System.Diagnostics;
 using Google.Cloud.Firestore;
 using static Google.Cloud.Firestore.V1.StructuredAggregationQuery.Types.Aggregation.Types;
 using System.Windows.Controls.Primitives;
+using System.Net;
 
 namespace UI_Chat_App
 {
@@ -411,166 +412,220 @@ namespace UI_Chat_App
 
 
 
-        private void AddMessageToUI(MessageData message)
+        private async Task AddMessageToUI(MessageData message)
         {
-            var isMine = message.SenderId == App.CurrentUser.Id;
-
-            if (_messages.Any(m => m.MessageId == message.MessageId))
-                return;
-
-            _messages.Add(message);
-
-            if (message.MessageType == "Text")
+            try
             {
-                DateTime time = message.Timestamp?.ToDateTime().ToLocalTime() ?? DateTime.MinValue;
-                var bubble = CreateMessageBubble(message.Content, time.ToShortTimeString(), isMine, message.IsSeen);
-                MessagesStackPanel.Children.Add(bubble);
-            }
-            else if (message.MessageType == "Image")
-            {
-                var image = new Image
-                {
-                    Width = 200,
-                    Height = 200
-                };
-                var binding = new Binding("FileUrl")
-                {
-                    Source = message,
-                    Converter = (IValueConverter)FindResource("ImageUrlConverter"),
-                    FallbackValue = new BitmapImage(new Uri("pack://application:,,,/Icons/user.png"))
-                };
-                image.SetBinding(Image.SourceProperty, binding);
-                MessagesStackPanel.Children.Add(CreateMessageBubble(image, isMine));
-            }
-            else if (message.MessageType == "File")
-            {
-                var hyperlink = new Hyperlink
-                {
-                    NavigateUri = new Uri(message.FileUrl),
-                    Inlines = { new Run(message.Content) }
-                };
-                hyperlink.RequestNavigate += (s, e) =>
-                {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = message.FileUrl,
-                        UseShellExecute = true
-                    });
-                };
-
-                var textBlock = new TextBlock
-                {
-                    Inlines = { hyperlink },
-                    FontSize = 16,
-                    TextWrapping = TextWrapping.Wrap
-                };
-
-                MessagesStackPanel.Children.Add(CreateMessageBubble(textBlock, isMine));
-            }
-            else if (message.MessageType == "Voice")
-            {
-                if (string.IsNullOrEmpty(message.FileUrl))
-                {
-                    MessagesStackPanel.Children.Add(CreateMessageBubble("Lỗi: Tin nhắn thoại không khả dụng", "", isMine));
+                if (message == null || _messages.Any(m => m.MessageId == message.MessageId))
                     return;
-                }
 
-                try
+                var isMine = message.SenderId == App.CurrentUser.Id;
+                _messages.Add(message);
+
+                // StackPanel chứa nội dung message
+                var stack = new StackPanel();
+
+                switch (message.MessageType)
                 {
-                    string tempFilePath = Path.Combine(Path.GetTempPath(), $"voice_{DateTime.Now.Ticks}.wav");
-                    using (var client = new System.Net.WebClient())
-                    {
-                        client.DownloadFile(message.FileUrl, tempFilePath);
-                    }
+                    case "Text":
+                        stack.Children.Add(new TextBlock
+                        {
+                            Text = message.Content,
+                            FontSize = 16,
+                            Foreground = Brushes.Black,
+                            TextWrapping = TextWrapping.Wrap
+                        });
+                        break;
 
-                    var playButton = new Button
-                    {
-                        Content = "Phát tin nhắn thoại",
-                        Tag = tempFilePath,
-                        Margin = new Thickness(5, 0, 5, 0)
-                    };
-                    playButton.Click += (s, e) =>
-                    {
+                    case "Image":
+                        var image = new Image
+                        {
+                            Width = 200,
+                            Height = 200,
+                            Stretch = Stretch.UniformToFill,
+                            Margin = new Thickness(0, 0, 0, 5)
+                        };
+                        var binding = new Binding("FileUrl")
+                        {
+                            Source = message,
+                            Converter = (IValueConverter)FindResource("ImageUrlConverter"),
+                            FallbackValue = new BitmapImage(new Uri("pack://application:,,,/Icons/user.png"))
+                        };
+                        image.SetBinding(Image.SourceProperty, binding);
+                        stack.Children.Add(image);
+                        break;
+
+                    case "File":
+                        if (string.IsNullOrEmpty(message.FileUrl) || !Uri.TryCreate(message.FileUrl, UriKind.Absolute, out var fileUri))
+                            return;
+
+                        var hyperlink = new Hyperlink
+                        {
+                            NavigateUri = fileUri,
+                            Inlines = { new Run(message.Content ?? "Tệp đính kèm") }
+                        };
+                        hyperlink.RequestNavigate += (s, e) =>
+                        {
+                            Process.Start(new ProcessStartInfo
+                            {
+                                FileName = message.FileUrl,
+                                UseShellExecute = true
+                            });
+                        };
+                        stack.Children.Add(new TextBlock
+                        {
+                            Inlines = { hyperlink },
+                            FontSize = 16,
+                            TextWrapping = TextWrapping.Wrap
+                        });
+                        break;
+
+                    case "Voice":
+                        if (string.IsNullOrEmpty(message.FileUrl))
+                        {
+                            stack.Children.Add(new TextBlock { Text = "Lỗi: Tin nhắn thoại không khả dụng" });
+                            break;
+                        }
+
+                        string tempFile = await DownloadToTempFileAsync(message.FileUrl, "wav");
+                        if (string.IsNullOrEmpty(tempFile))
+                        {
+                            stack.Children.Add(new TextBlock { Text = "Lỗi: Không tải được tin nhắn thoại" });
+                            break;
+                        }
+
+                        var playButton = new Button
+                        {
+                            Content = "Phát tin nhắn thoại",
+                            Tag = tempFile,
+                            Margin = new Thickness(5)
+                        };
+                        playButton.Click += (s, e) =>
+                        {
+                            try
+                            {
+                                var filePath = (string)((Button)s).Tag;
+                                var audioFile = new AudioFileReader(filePath);
+                                var outputDevice = new WaveOutEvent();
+                                outputDevice.Init(audioFile);
+                                outputDevice.Play();
+                                outputDevice.PlaybackStopped += (snd, args) =>
+                                {
+                                    audioFile.Dispose();
+                                    outputDevice.Dispose();
+                                };
+                            }
+                            catch (Exception ex)
+                            {
+                                MessageBox.Show($"Không thể phát tin nhắn thoại: {ex.Message}");
+                            }
+                        };
+                        stack.Children.Add(playButton);
+                        break;
+
+                    case "Emoji":
                         try
                         {
-                            var filePath = (string)((Button)s).Tag;
-                            var audioFile = new AudioFileReader(filePath);
-                            var outputDevice = new WaveOutEvent();
-                            outputDevice.Init(audioFile);
-                            outputDevice.Play();
-                            while (outputDevice.PlaybackState == PlaybackState.Playing)
+                            var emojiPath = $"pack://application:,,,/Emoji/{message.Content}.png";
+                            var emojiImage = new Image
                             {
-                                System.Threading.Thread.Sleep(100);
-                            }
+                                Source = new BitmapImage(new Uri(emojiPath)),
+                                Width = 40,
+                                Height = 40,
+                                Stretch = Stretch.Uniform
+                            };
+                            stack.Children.Add(emojiImage);
                         }
-                        catch (Exception ex)
+                        catch
                         {
-                            MessageBox.Show($"Không thể phát tin nhắn thoại: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                            stack.Children.Add(new TextBlock
+                            {
+                                Text = "[Không thể hiển thị emoji]",
+                                Foreground = Brushes.Red,
+                                FontSize = 14
+                            });
                         }
-                    };
-
-                    MessagesStackPanel.Children.Add(CreateMessageBubble(playButton, isMine));
+                        break;
                 }
-                catch
-                {
-                    MessagesStackPanel.Children.Add(CreateMessageBubble("Lỗi: Tin nhắn thoại không khả dụng", "", isMine));
-                }
-            }
-            else if (message.MessageType == "Emoji")
-            {
-                try
-                {
-                    var emojiPath = $"pack://application:,,,/Emoji/{message.Content}.png";
-                    var emojiImage = new Image
-                    {
-                        Source = new BitmapImage(new Uri(emojiPath, UriKind.Absolute)),
-                        Width = 40,
-                        Height = 40,
-                        Stretch = Stretch.Uniform
-                    };
 
-                    var emojiContainer = new Border
-                    {
-                        Child = emojiImage,
-                        Background = isMine ? Brushes.LightGreen : Brushes.White,
-                        CornerRadius = new CornerRadius(10),
-                        Padding = new Thickness(10),
-                        Margin = new Thickness(5),
-                        HorizontalAlignment = isMine ? HorizontalAlignment.Right : HorizontalAlignment.Left,
-                        Effect = new System.Windows.Media.Effects.DropShadowEffect
-                        {
-                            BlurRadius = 5,
-                            Opacity = 0.2,
-                            ShadowDepth = 2
-                        }
-                    };
-
-                    MessagesStackPanel.Children.Add(emojiContainer);
-                }
-                catch
+                // Thêm thời gian gửi
+                var time = message.Timestamp?.ToDateTime().ToLocalTime().ToShortTimeString() ?? "";
+                stack.Children.Add(new TextBlock
                 {
-                    MessagesStackPanel.Children.Add(new TextBlock
+                    Text = time,
+                    FontSize = 10,
+                    Foreground = Brushes.Gray,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Margin = new Thickness(0, 5, 0, 0)
+                });
+
+                // Trạng thái Seen (nếu là tin nhắn của mình)
+                if (isMine && message.IsSeen)
+                {
+                    stack.Children.Add(new TextBlock
                     {
-                        Text = "[Không thể hiển thị emoji]",
-                        Foreground = Brushes.Red,
-                        FontSize = 14,
-                        Margin = new Thickness(5),
-                        HorizontalAlignment = isMine ? HorizontalAlignment.Right : HorizontalAlignment.Left
+                        Text = "✔ Seen",
+                        FontSize = 10,
+                        Foreground = Brushes.Green,
+                        HorizontalAlignment = HorizontalAlignment.Right
                     });
                 }
+
+                // Bọc trong Border cho đẹp
+                var border = new Border
+                {
+                    Background = isMine ? Brushes.LightGreen : Brushes.White,
+                    CornerRadius = new CornerRadius(10),
+                    Padding = new Thickness(10),
+                    Margin = new Thickness(5),
+                    MaxWidth = 300,
+                    Child = stack,
+                    HorizontalAlignment = isMine ? HorizontalAlignment.Right : HorizontalAlignment.Left,
+                    Effect = new System.Windows.Media.Effects.DropShadowEffect
+                    {
+                        BlurRadius = 5,
+                        Opacity = 0.2,
+                        ShadowDepth = 2
+                    }
+                };
+
+                MessagesStackPanel.Children.Add(border);
+
+                MessagesScrollViewer.ScrollToEnd();
+
+                // Cập nhật trạng thái seen nếu là người nhận
+                if (!message.IsSeen && message.ReceiverId == App.CurrentUser.Id)
+                {
+                    message.IsSeen = true;
+                    _ = _databaseService.MarkMessageAsSeenAsync(_currentChatRoomId, message.MessageId);
+                }
+
+                _lastMessageTimestamp = message.Timestamp;
             }
-
-            MessagesScrollViewer.ScrollToEnd();
-
-            if (!message.IsSeen && message.ReceiverId == App.CurrentUser.Id)
+            catch (Exception ex)
             {
-                message.IsSeen = true;
-                _ = _databaseService.MarkMessageAsSeenAsync(_currentChatRoomId, message.MessageId);
+                Debug.WriteLine($"Lỗi hiển thị tin nhắn: {ex.Message}");
             }
-
-            // ✅ Cập nhật thời gian cuối cùng đã nhận
-            _lastMessageTimestamp = message.Timestamp;
         }
+
+
+        private async Task<string> DownloadToTempFileAsync(string url, string extension)
+        {
+            if (string.IsNullOrEmpty(url)) return null;
+
+            try
+            {
+                var tempPath = Path.Combine(Path.GetTempPath(), $"chat_{Guid.NewGuid()}.{extension}");
+                var client = new WebClient();
+                await client.DownloadFileTaskAsync(url, tempPath);
+                return tempPath;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
 
 
 
@@ -1410,6 +1465,34 @@ namespace UI_Chat_App
             TabControl.SelectedIndex = 1;
 
         }
+
+    //    private async void CreateGroupButton_Click(object sender, RoutedEventArgs e)
+    //    {
+    //        var groupName = GroupNameTextBox.Text.Trim();
+    //        if (string.IsNullOrWhiteSpace(groupName))
+    //        {
+    //            MessageBox.Show("Vui lòng nhập tên nhóm.");
+    //            return;
+    //        }
+
+    //        var groupId = Guid.NewGuid().ToString();
+
+    //        var groupData = new Dictionary<string, object>
+    //{
+    //    { "name", groupName },
+    //    { "createdBy", App.CurrentUser.Id },
+    //    { "createdAt", Timestamp.GetCurrentTimestamp() },
+    //    { "members", new Dictionary<string, object> { { App.CurrentUser.Id, "admin" } } }
+    //};
+
+    //        var firestore = _databaseService.GetDb(); // sửa từ DefaultInstance
+    //        var groupRef = firestore.Collection("groups").Document(groupId);
+    //        await groupRef.SetAsync(groupData);
+
+    //        MessageBox.Show($"Tạo nhóm thành công!\nID nhóm: {groupId}");
+    //        this.Close();
+    //    }
+
 
         private void AddGroupsButton_Click(object sender, RoutedEventArgs e)
         {
