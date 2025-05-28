@@ -6,10 +6,11 @@
         xmlns:converters="clr-namespace:UI_Chat_App.Converters" 
         xmlns:local="clr-namespace:UI_Chat_App"   
         mc:Ignorable="d"
-        Title="ChatWindow" Height="500" Width="1000" WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        WindowStartupLocation="CenterScreen" MouseLeftButtonDown="Window_MouseLeftButtonDown">
+        Title="ChatWindow" Height="500" Width="1000" WindowStyle="None" AllowsTransparency="False" Background="Transparent"
+        WindowStartupLocation="CenterScreen" MouseLeftButtonDown="Window_MouseLeftButtonDown"
+        ResizeMode="CanResize">
     <Window.Resources>
-        
+
         <!-- Thêm ImageUrlConverter vào Resources -->
         <converters:ImageUrlConverter x:Key="ImageUrlConverter"/>
 
@@ -120,7 +121,7 @@
             <Setter Property="TextAlignment" Value="Right"/>
             <Setter Property="HorizontalAlignment" Value="Right"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
-            
+
         </Style>
         <!-- Style cho ListBox bo tròn -->
         <Style x:Key="RoundedListBoxStyle" TargetType="ListBox">
@@ -178,7 +179,7 @@
                            Foreground="{Binding IsOnline, Converter={StaticResource BooleanToColorConverter}}" 
                            Margin="0,3,0,0"/>
                     </StackPanel>
-        
+
                     <!-- Popup và nút More Options -->
                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
                         <Button x:Name="MoreOptionsButton"
@@ -198,35 +199,35 @@
            AllowsTransparency="True">
                             <Border Background="White" CornerRadius="8" Padding="5" BorderBrush="LightGray" BorderThickness="1">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" >
-    <!-- Nút Trash -->
-    <Button Width="30" Height="30"
+                                    <!-- Nút Trash -->
+                                    <Button Width="30" Height="30"
             Background="Transparent"
             BorderBrush="Transparent"
             Click="DeleteUserButton_Click"
             Style="{StaticResource WindowButtonStyle}">
-        <Image Source="Icons/trash.png" Width="20" Height="20"/>
-    </Button>
+                                        <Image Source="Icons/trash.png" Width="20" Height="20"/>
+                                    </Button>
 
-    <!-- Nút Thumbtack -->
-    <Button Width="30" Height="30"
+                                    <!-- Nút Thumbtack -->
+                                    <Button Width="30" Height="30"
             Background="Transparent"
             BorderBrush="Transparent"
             Click="ThumbtackButton_Click"
             Style="{StaticResource WindowButtonStyle}">
-        <Image Source="Icons/thumbtack.png" Width="20" Height="20"/>
-    </Button>
+                                        <Image Source="Icons/thumbtack.png" Width="20" Height="20"/>
+                                    </Button>
 
-    <!-- Nút Block -->
-    <Button Width="30" Height="30"
+                                    <!-- Nút Block -->
+                                    <Button Width="30" Height="30"
             Background="Transparent"
             BorderBrush="Transparent"
             Click="BlockUserButton_Click"
             Style="{StaticResource WindowButtonStyle}">
-        <Image Source="Icons/block.png" Width="20" Height="20"/>
-    </Button>
-</StackPanel>
+                                        <Image Source="Icons/block.png" Width="20" Height="20"/>
+                                    </Button>
+                                </StackPanel>
                             </Border>
-                            
+
                         </Popup>
                     </StackPanel>
 
@@ -269,7 +270,7 @@
             </Border>
         </DataTemplate>
 
-        
+
     </Window.Resources>
     <Border Background="DarkGray" CornerRadius="30">
         <Grid>
@@ -279,6 +280,7 @@
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="280"/>
+
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="230"/>
             </Grid.ColumnDefinitions>
@@ -395,7 +397,7 @@
             Width="250" Height="300">
 
                                 <StackPanel  x:Name="NotificationListPanel">
-                                    
+
                                 </StackPanel>
 
                             </Border>
@@ -413,9 +415,9 @@
                             <Image Source="Icons/add_groups.png" Width="20" Height="20"/>
                         </Button>
                     </Grid>
-                    
-                    
-                    
+
+
+
                     <!-- TabControl cho danh sách bạn bè và thêm bạn -->
                     <TabControl x:Name="TabControl" Grid.Row="1" SelectionChanged="TabControl_SelectionChanged">
                         <TabItem>
@@ -556,7 +558,7 @@
                                                         </StackPanel>
                                                     </Grid>
 
-                                                   
+
                                                 </Border>
 
                                                 <!-- DataTemplate.Triggers để điều chỉnh button trạng thái -->
@@ -568,61 +570,69 @@
                                                 </DataTemplate.Triggers>
                                             </DataTemplate>
                                         </ListBox.ItemTemplate>
-                                </ListBox>
-                                <ListBox x:Name="FriendRequestsListBox" Style="{StaticResource RoundedListBoxStyle}" Margin="5">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Background="WhiteSmoke" BorderBrush="Transparent" BorderThickness="0" CornerRadius="10" Padding="10" Margin="5" Width="200">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="50"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <!-- Hiển thị avatar -->
-                                                    <Image Source="{Binding Sender.Avatar, Converter={StaticResource ImageUrlConverter}, FallbackValue='Icons/user.png'}" 
+                                    </ListBox>
+                                    <ListBox x:Name="FriendRequestsListBox" Style="{StaticResource RoundedListBoxStyle}" Margin="5">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="WhiteSmoke" BorderBrush="Transparent" BorderThickness="0" CornerRadius="10" Padding="10" Margin="5" Width="200">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="50"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <!-- Hiển thị avatar -->
+                                                        <Image Source="{Binding Sender.Avatar, Converter={StaticResource ImageUrlConverter}, FallbackValue='Icons/user.png'}" 
                                                            Width="40" Height="40" Margin="0,0,10,0" Grid.Column="0"/>
-                                                    <!-- Hiển thị tên người gửi -->
-                                                    <TextBlock Text="{Binding Sender.DisplayName}" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Foreground="Black" Grid.Column="1"/>
-                                                    <Button Grid.Column="2" Content="Accept" Margin="5,0" Click="AcceptFriendRequest_Click" Tag="{Binding FriendRequest.RequestId}" Style="{StaticResource WindowButtonStyle}"/>
-                                                    <Button Grid.Column="3" Content="Reject" Margin="5,0" Click="RejectFriendRequest_Click" Tag="{Binding FriendRequest.RequestId}" Style="{StaticResource WindowButtonStyle}"/>
-                                                </Grid>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-                                <Button Content="View Friend Requests" Click="ViewFriendRequests_Click" Margin="5" Style="{StaticResource WindowButtonStyle}"/>
-                                <!-- Thêm danh sách lời mời đã gửi -->
-                                <ListBox x:Name="SentFriendRequestsListBox" Style="{StaticResource RoundedListBoxStyle}" Margin="5">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Background="WhiteSmoke" BorderBrush="Transparent" BorderThickness="0" CornerRadius="10" Padding="10" Margin="5" Width="200">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="50"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <!-- Hiển thị avatar của người nhận -->
-                                                    <Image Source="{Binding Sender.Avatar, Converter={StaticResource ImageUrlConverter}, FallbackValue='Icons/user.png'}" 
+                                                        <!-- Hiển thị tên người gửi -->
+                                                        <TextBlock Text="{Binding Sender.DisplayName}" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Foreground="Black" Grid.Column="1"/>
+                                                        <Button Grid.Column="2" Content="Accept" Margin="5,0" Click="AcceptFriendRequest_Click" Tag="{Binding FriendRequest.RequestId}" Style="{StaticResource WindowButtonStyle}"/>
+                                                        <Button Grid.Column="3" Content="Reject" Margin="5,0" Click="RejectFriendRequest_Click" Tag="{Binding FriendRequest.RequestId}" Style="{StaticResource WindowButtonStyle}"/>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                    <Button Content="View Friend Requests" Click="ViewFriendRequests_Click" Margin="5" Style="{StaticResource WindowButtonStyle}"/>
+                                    <!-- Thêm danh sách lời mời đã gửi -->
+                                    <ListBox x:Name="SentFriendRequestsListBox" Style="{StaticResource RoundedListBoxStyle}" Margin="5">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="WhiteSmoke" BorderBrush="Transparent" BorderThickness="0" CornerRadius="10" Padding="10" Margin="5" Width="200">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="50"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <!-- Hiển thị avatar của người nhận -->
+                                                        <Image Source="{Binding Sender.Avatar, Converter={StaticResource ImageUrlConverter}, FallbackValue='Icons/user.png'}" 
                                                            Width="40" Height="40" Margin="0,0,10,0" Grid.Column="0"/>
-                                                    <!-- Hiển thị tên của người nhận -->
-                                                    <TextBlock Text="{Binding Sender.DisplayName}" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Foreground="Black" Grid.Column="1"/>
-                                                    <!-- Nút hủy lời mời -->
-                                                    <Button Grid.Column="2" Content="Cancel" Margin="5,0" Click="CancelFriendRequest_Click" Tag="{Binding FriendRequest.RequestId}" Style="{StaticResource WindowButtonStyle}"/>
-                                                </Grid>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-                                <Button Content="View Sent Friend Requests" Click="ViewSentFriendRequests_Click" Margin="5" Style="{StaticResource WindowButtonStyle}"/>
-                            </StackPanel>
+                                                        <!-- Hiển thị tên của người nhận -->
+                                                        <TextBlock Text="{Binding Sender.DisplayName}" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Foreground="Black" Grid.Column="1"/>
+                                                        <!-- Nút hủy lời mời -->
+                                                        <Button Grid.Column="2" Content="Cancel" Margin="5,0" Click="CancelFriendRequest_Click" Tag="{Binding FriendRequest.RequestId}" Style="{StaticResource WindowButtonStyle}"/>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                    <Button Content="View Sent Friend Requests" Click="ViewSentFriendRequests_Click" Margin="5" Style="{StaticResource WindowButtonStyle}"/>
+                                </StackPanel>
                             </ScrollViewer>
                         </TabItem>
                     </TabControl>
                 </Grid>
             </Border>
+
+            <GridSplitter Grid.Column="0"
+              Grid.Row="1"
+              Width="1"
+              Height="Auto"
+              Background="Transparent"
+              ResizeBehavior="CurrentAndNext"
+              ResizeDirection="Columns" Margin="0,10,0,0"/>
 
             <!-- Cột khu vực chat -->
             <Border Grid.Row="1" Grid.Column="1" Background="#ECF0F1" CornerRadius="0,20,20,0" Margin="10,10,0,10">
@@ -660,7 +670,7 @@
                         <StackPanel x:Name="MessagesStackPanel">
                             <!-- Tin nhắn sẽ được thêm vào đây -->
                         </StackPanel>
-                        
+
                     </ScrollViewer>
                     <Grid Grid.Row="2" Grid.ColumnSpan="2" VerticalAlignment="Bottom" Margin="10">
                         <Grid.ColumnDefinitions>
@@ -686,14 +696,14 @@
 
 
                                 <!-- Thêm EmojiPanel -->
-                            
-                            <!-- Attach Button -->
-                            <Button x:Name="AttachButton" Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="AttachButton_Click" Style="{StaticResource WindowButtonStyle}">
-                                <Image Source="Icons/attach.png" Width="20" Height="20" RenderTransformOrigin="1,1"/>
-                            </Button>
-                            
-                        </StackPanel>
-                        <Button x:Name="VoiceRecordButton" Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="VoiceRecordButton_Click" Style="{StaticResource WindowButtonStyle}">
+
+                                <!-- Attach Button -->
+                                <Button x:Name="AttachButton" Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="AttachButton_Click" Style="{StaticResource WindowButtonStyle}">
+                                    <Image Source="Icons/attach.png" Width="20" Height="20" RenderTransformOrigin="1,1"/>
+                                </Button>
+
+                            </StackPanel>
+                            <Button x:Name="VoiceRecordButton" Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="VoiceRecordButton_Click" Style="{StaticResource WindowButtonStyle}">
                                 <Image Source="Icons/voice_record.png" Width="20" Height="20" RenderTransformOrigin="1,1"/>
                             </Button>
                         </StackPanel>
@@ -703,7 +713,7 @@
                            Visibility="Collapsed"
                            Foreground="Gray"
                            FontStyle="Italic"
-                           Margin="10,0,10,10"/>    
+                           Margin="10,0,10,10"/>
 
                         <UniformGrid Grid.Column="2" Columns="2" HorizontalAlignment="Right" VerticalAlignment="Center">
                             <!-- Nút Like -->
@@ -748,16 +758,24 @@
                 </Grid>
             </Border>
 
+            <GridSplitter Grid.Column="1"
+               Grid.Row="1"
+              Width="1"
+              Background="Transparent"
+              ResizeBehavior="CurrentAndNext"
+              ResizeDirection="Columns" Margin="0,10,0,0"/>
+
+
             <!-- Cột hồ sơ người dùng -->
             <Border Grid.Row="1" Grid.Column="2" Background="CadetBlue" CornerRadius="0,0,30,0" Margin="10">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="10">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            
+
                             <Button x:Name="UserPenButton" Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="UserPenButton_Click" Style="{StaticResource WindowButtonStyle}">
                                 <Image Source="Icons/user_pen.png" Width="20" Height="20"/>
                             </Button>
-                            
+
                         </StackPanel>
                         <TextBlock Text="User Profile" FontSize="24" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
                         <Image x:Name="ProfileAvatar" Width="100" Height="100" Margin="0,10,0,10" Cursor="Hand"/>
