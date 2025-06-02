@@ -1484,8 +1484,8 @@ namespace UI_Chat_App
         }
 
 
-    //    private async void CreateGroupButton_Click(object sender, RoutedEventArgs e)
-    //    {
+        private async void CreateGroupButton_Click(object sender, RoutedEventArgs e)
+        {
     //        var groupName = GroupNameTextBox.Text.Trim();
     //        if (string.IsNullOrWhiteSpace(groupName))
     //        {
@@ -1509,7 +1509,7 @@ namespace UI_Chat_App
 
     //        MessageBox.Show($"Tạo nhóm thành công!\nID nhóm: {groupId}");
     //        this.Close();
-    //    }
+        }
 
 
         private void AddGroupsButton_Click(object sender, RoutedEventArgs e)
