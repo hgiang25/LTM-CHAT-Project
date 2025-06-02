@@ -357,63 +357,55 @@
             Style="{StaticResource WindowButtonStyle}">
                             <Image Source="Icons/search.png" Width="20" Height="20"/>
                         </Button>
-                        <Button Width="30" Height="30"
-                        Grid.Column="2"
-        Background="Transparent"
-        BorderBrush="Transparent"
-        Click="NotificationButton_Click"
-        Style="{StaticResource WindowButtonStyle}">
+                        
+                        <!--Nút notification-->
+                        <Button x:Name="NotificationButton"
+                            Width="30" Height="30"
+                            Grid.Column="2"
+                            Background="Transparent"
+                            BorderBrush="Transparent"
+                            Click="NotificationButton_Click"
+                            Style="{StaticResource WindowButtonStyle}">
                             <Grid>
                                 <Image Source="Icons/notification.png" Width="20" Height="20"/>
 
                                 <TextBlock x:Name="NotificationCountText"
-                   Text="0"
-                   FontSize="10"
-                   FontWeight="Bold"
-                   Foreground="Red"
-                   Background="White"
-                   TextAlignment="Center"
-                   VerticalAlignment="Top"
-                   HorizontalAlignment="Right"
-                   Margin="0,0,0,0"
-                   Visibility="Collapsed"
-                   Width="14" Height="14"
-                   Padding="0"
-                   ClipToBounds="True"/>
+                                           Text="0"
+                                           FontSize="10"
+                                           FontWeight="Bold"
+                                           Foreground="Red"
+                                           Background="White"
+                                           TextAlignment="Center"
+                                           VerticalAlignment="Top"
+                                           HorizontalAlignment="Right"
+                                           Margin="0,0,0,0"
+                                           Visibility="Collapsed"
+                                           Width="14" Height="14"
+                                           Padding="0"
+                                           ClipToBounds="True"/>            
                             </Grid>
                         </Button>
                         <Popup x:Name="NotificationPopup"
-       Placement="Bottom"
-       PlacementTarget="{Binding ElementName=NotificationButton}"
-       StaysOpen="False"
-       AllowsTransparency="True"
-       PopupAnimation="Slide">
-
+                               Placement="Custom"
+                               CustomPopupPlacementCallback="NotificationPopup_PlacementCallback"
+                               StaysOpen="False"
+                               AllowsTransparency="True"
+                               PopupAnimation="Slide">
                             <Border Background="White"
-            BorderBrush="Gray"
-            BorderThickness="1"
-            CornerRadius="5"
-            Padding="10"
-            Width="250" Height="300">
-
-                                <StackPanel  x:Name="NotificationListPanel">
-
-                                </StackPanel>
-
+                                    BorderBrush="Gray"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    Padding="10"
+                                    Width="250" Height="300"
+                                    SnapsToDevicePixels="True"> 
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel x:Name="NotificationListPanel">
+                                        <!-- Các item  thông báo sẽ được thêm tại đây từ C# -->
+                                    </StackPanel>
+                                </ScrollViewer>
                             </Border>
                         </Popup>
 
-                        <!-- Nút AddGroups -->
-                        <Button x:Name="AddGroupsButton"
-            Width="30"
-            Height="30"
-            Grid.Column="3"
-            Background="Transparent"
-            BorderBrush="Transparent"
-            Click="AddGroupsButton_Click"
-            Style="{StaticResource WindowButtonStyle}">
-                            <Image Source="Icons/add_groups.png" Width="20" Height="20"/>
-                        </Button>
                     </Grid>
 
 
@@ -571,35 +563,155 @@
                                             </DataTemplate>
                                         </ListBox.ItemTemplate>
                                     </ListBox>
-                                    <ListBox x:Name="FriendRequestsListBox" Style="{StaticResource RoundedListBoxStyle}" Margin="5">
+                                    <Button Content="View Friend Requests" Click="ViewFriendRequests_Click" Margin="5" Style="{StaticResource WindowButtonStyle}"/>
+
+                                    <ListBox x:Name="FriendRequestsListBox" Style="{StaticResource RoundedListBoxStyle}" Margin="5" HorizontalContentAlignment="Stretch">
+                                        <ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="BorderBrush" Value="Transparent"/>
+                                            <Setter Property="BorderThickness" Value="0"/>
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="Margin" Value="0"/>
+                                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                            <Setter Property="OverridesDefaultStyle" Value="True"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="ListBoxItem">
+                                                        <ContentPresenter/>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                        </ListBox.ItemContainerStyle>
+
                                         <ListBox.ItemTemplate>
                                             <DataTemplate>
-                                                <Border Background="WhiteSmoke" BorderBrush="Transparent" BorderThickness="0" CornerRadius="10" Padding="10" Margin="5" Width="200">
+                                                <Border HorizontalAlignment="Stretch" Background="White" BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="12" Padding="10" Margin="5" SnapsToDevicePixels="True">
+                                                    <Border.Effect>
+                                                        <DropShadowEffect BlurRadius="10" ShadowDepth="2" Color="Gray" Opacity="0.2"/>
+                                                    </Border.Effect>
+                                                    <Border.RenderTransform>
+                                                        <ScaleTransform ScaleX="1" ScaleY="1"/>
+                                                    </Border.RenderTransform>
+                                                    <Border.RenderTransformOrigin>0.5,0.5</Border.RenderTransformOrigin>
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Style.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Trigger.EnterActions>
+                                                                        <BeginStoryboard>
+                                                                            <Storyboard>
+                                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.05" Duration="0:0:0.15"/>
+                                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.05" Duration="0:0:0.15"/>
+                                                                            </Storyboard>
+                                                                        </BeginStoryboard>
+                                                                    </Trigger.EnterActions>
+                                                                    <Trigger.ExitActions>
+                                                                        <BeginStoryboard>
+                                                                            <Storyboard>
+                                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1" Duration="0:0:0.15"/>
+                                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1" Duration="0:0:0.15"/>
+                                                                            </Storyboard>
+                                                                        </BeginStoryboard>
+                                                                    </Trigger.ExitActions>
+                                                                </Trigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
                                                     <Grid>
                                                         <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="50"/>
+                                                            <ColumnDefinition Width="Auto"/>
                                                             <ColumnDefinition Width="*"/>
                                                             <ColumnDefinition Width="Auto"/>
                                                             <ColumnDefinition Width="Auto"/>
                                                         </Grid.ColumnDefinitions>
-                                                        <!-- Hiển thị avatar -->
-                                                        <Image Source="{Binding Sender.Avatar, Converter={StaticResource ImageUrlConverter}, FallbackValue='Icons/user.png'}" 
-                                                           Width="40" Height="40" Margin="0,0,10,0" Grid.Column="0"/>
-                                                        <!-- Hiển thị tên người gửi -->
-                                                        <TextBlock Text="{Binding Sender.DisplayName}" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Foreground="Black" Grid.Column="1"/>
-                                                        <Button Grid.Column="2" Content="Accept" Margin="5,0" Click="AcceptFriendRequest_Click" Tag="{Binding FriendRequest.RequestId}" Style="{StaticResource WindowButtonStyle}"/>
-                                                        <Button Grid.Column="3" Content="Reject" Margin="5,0" Click="RejectFriendRequest_Click" Tag="{Binding FriendRequest.RequestId}" Style="{StaticResource WindowButtonStyle}"/>
+
+                                                        <!-- Avatar -->
+                                                        <Border HorizontalAlignment="Stretch" Width="50" Height="50" CornerRadius="25" ClipToBounds="True" Grid.Column="0">
+                                                            <Image Source="{Binding Sender.Avatar, Converter={StaticResource ImageUrlConverter}, FallbackValue='Icons/user.png'}" Width="50" Height="50" Stretch="UniformToFill"/>
+                                                        </Border>
+
+                                                        <!-- Tên -->
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0">
+                                                            <TextBlock Text="{Binding Sender.DisplayName}" FontSize="16" FontWeight="SemiBold" Foreground="#333"/>
+                                                        </StackPanel>
+
+                                                        <!-- Nút Accept -->
+                                                        <Button Grid.Column="2" Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" 
+                            Click="AcceptFriendRequest_Click" Tag="{Binding FriendRequest.RequestId}" Style="{StaticResource WindowButtonStyle}">
+                                                            <Image Source="Icons/check.png" Width="20" Height="20"/>
+                                                        </Button>
+
+                                                        <!-- Nút Reject -->
+                                                        <Button Grid.Column="3" Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" 
+                            Click="RejectFriendRequest_Click" Tag="{Binding FriendRequest.RequestId}" Style="{StaticResource WindowButtonStyle}">
+                                                            <Image Source="Icons/cancel.png" Width="20" Height="20"/>
+                                                        </Button>
                                                     </Grid>
                                                 </Border>
                                             </DataTemplate>
                                         </ListBox.ItemTemplate>
                                     </ListBox>
-                                    <Button Content="View Friend Requests" Click="ViewFriendRequests_Click" Margin="5" Style="{StaticResource WindowButtonStyle}"/>
+                                    <Button Content="View Sent Friend Requests" Click="ViewSentFriendRequests_Click" Margin="5" Style="{StaticResource WindowButtonStyle}"/>
+    
                                     <!-- Thêm danh sách lời mời đã gửi -->
-                                    <ListBox x:Name="SentFriendRequestsListBox" Style="{StaticResource RoundedListBoxStyle}" Margin="5">
+                                    <ListBox x:Name="SentFriendRequestsListBox" Style="{StaticResource RoundedListBoxStyle}" Margin="5" HorizontalContentAlignment="Stretch">
+<ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="BorderBrush" Value="Transparent"/>
+                                            <Setter Property="BorderThickness" Value="0"/>
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="Margin" Value="0"/>
+                                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                            <Setter Property="OverridesDefaultStyle" Value="True"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="ListBoxItem">
+                                                        <ContentPresenter/>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                        </ListBox.ItemContainerStyle>
+
+
+
                                         <ListBox.ItemTemplate>
                                             <DataTemplate>
-                                                <Border Background="WhiteSmoke" BorderBrush="Transparent" BorderThickness="0" CornerRadius="10" Padding="10" Margin="5" Width="200">
+                                                <Border HorizontalAlignment="Stretch" Background="White" BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="12" Padding="10" Margin="5" SnapsToDevicePixels="True">
+                                                    <Border.Effect>
+                                                        <DropShadowEffect BlurRadius="10" ShadowDepth="2" Color="Gray" Opacity="0.2"/>
+                                                    </Border.Effect>
+                                                    <Border.RenderTransform>
+                                                        <ScaleTransform ScaleX="1" ScaleY="1"/>
+                                                    </Border.RenderTransform>
+                                                    <Border.RenderTransformOrigin>0.5,0.5</Border.RenderTransformOrigin>
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Style.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Trigger.EnterActions>
+                                                                        <BeginStoryboard>
+                                                                            <Storyboard>
+                                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.05" Duration="0:0:0.15"/>
+                                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.05" Duration="0:0:0.15"/>
+                                                                            </Storyboard>
+                                                                        </BeginStoryboard>
+                                                                    </Trigger.EnterActions>
+                                                                    <Trigger.ExitActions>
+                                                                        <BeginStoryboard>
+                                                                            <Storyboard>
+                                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1" Duration="0:0:0.15"/>
+                                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1" Duration="0:0:0.15"/>
+                                                                            </Storyboard>
+                                                                        </BeginStoryboard>
+                                                                    </Trigger.ExitActions>
+                                                                </Trigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
                                                     <Grid>
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="50"/>
@@ -608,7 +720,7 @@
                                                         </Grid.ColumnDefinitions>
                                                         <!-- Hiển thị avatar của người nhận -->
                                                         <Image Source="{Binding Sender.Avatar, Converter={StaticResource ImageUrlConverter}, FallbackValue='Icons/user.png'}" 
-                                                           Width="40" Height="40" Margin="0,0,10,0" Grid.Column="0"/>
+       Width="40" Height="40" Margin="0,0,10,0" Grid.Column="0"/>
                                                         <!-- Hiển thị tên của người nhận -->
                                                         <TextBlock Text="{Binding Sender.DisplayName}" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Foreground="Black" Grid.Column="1"/>
                                                         <!-- Nút hủy lời mời -->
@@ -618,10 +730,82 @@
                                             </DataTemplate>
                                         </ListBox.ItemTemplate>
                                     </ListBox>
-                                    <Button Content="View Sent Friend Requests" Click="ViewSentFriendRequests_Click" Margin="5" Style="{StaticResource WindowButtonStyle}"/>
                                 </StackPanel>
                             </ScrollViewer>
                         </TabItem>
+                        
+                        
+                        <!-- TabItem cho nhóm bạn bè -->
+                        <TabItem>
+                            <TabItem.Header>
+                                <Button x:Name="AddGroupsTabButton" Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="AddGroupsButton_Click" Style="{StaticResource WindowButtonStyle}">
+                                    <Image Source="Icons/add_groups.png" Width="20" Height="20"/>
+                                </Button>
+                            </TabItem.Header>
+
+                            <!-- Nội dung tab chọn bạn tạo nhóm -->
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="10">
+                                <ListBox x:Name="GroupUserListBox"
+                                         Style="{StaticResource RoundedListBoxStyle}"
+                                         HorizontalContentAlignment="Stretch"
+                                         SelectionMode="Multiple">  
+                                    
+                                    <!--<ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="BorderBrush" Value="Transparent"/>
+                                            <Setter Property="BorderThickness" Value="0"/>
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="Margin" Value="0"/>
+                                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                            <Setter Property="OverridesDefaultStyle" Value="True"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="ListBoxItem">
+                                                        <ContentPresenter/>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </ListBox.ItemContainerStyle>
+
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="White" BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="12" Padding="10" Margin="5" SnapsToDevicePixels="True" HorizontalAlignment="Stretch">
+                                                <Border.Effect>
+                                                    <DropShadowEffect BlurRadius="10" ShadowDepth="2" Color="Gray" Opacity="0.2"/>
+                                                </Border.Effect>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        --><!-- Checkbox --><!--
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        --><!-- Avatar --><!--
+                                                        <ColumnDefinition Width="*"/>
+                                                        --><!-- Info --><!--
+                                                    </Grid.ColumnDefinitions>
+
+                                                    --><!-- Tick --><!--
+                                                    <CheckBox Grid.Column="0" VerticalAlignment="Center" Margin="5" IsChecked="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+
+                                                    --><!-- Avatar --><!--
+                                                    <Border Width="50" Height="50" CornerRadius="25" ClipToBounds="True" Grid.Column="1">
+                                                        <Image Source="{Binding Avatar, Converter={StaticResource ImageUrlConverter}, FallbackValue='Icons/user.png'}"
+                                                                Width="50" Height="50" Stretch="UniformToFill"/>
+                                                    </Border>
+
+                                                    --><!-- Tên --><!--
+                                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="10,0,0,0">
+                                                        <TextBlock Text="{Binding DisplayName}" FontSize="16" FontWeight="SemiBold" Foreground="#333"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>-->
+                                </ListBox>
+                            </ScrollViewer>
+                        </TabItem>
+
                     </TabControl>
                 </Grid>
             </Border>

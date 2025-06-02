@@ -1380,10 +1380,25 @@ namespace UI_Chat_App
             }
         }
 
+        private CustomPopupPlacement[] NotificationPopup_PlacementCallback(Size popupSize, Size targetSize, Point offset)
+        {
+            // Hiển thị ngay dưới NotificationButton
+            double xOffset = (targetSize.Width - popupSize.Width) / 2;
+            double yOffset = targetSize.Height;
+
+            return new[]
+            {
+        new CustomPopupPlacement(new Point(xOffset, yOffset), PopupPrimaryAxis.Horizontal)
+    };
+        }
+
+
         private async void NotificationButton_Click(object sender, RoutedEventArgs e)
         {
             // Code xử lý khi nhấn nút thông báo
             //NotificationPopup.IsOpen = !NotificationPopup.IsOpen;
+            NotificationPopup.PlacementTarget = NotificationButton;
+
             NotificationPopup.IsOpen = true;
             NotificationListPanel.Children.Clear();
 
@@ -1415,6 +1430,7 @@ namespace UI_Chat_App
 
                 NotificationListPanel.Children.Add(button);
             }
+
         }
 
         private string GetUserNameById(string id)
@@ -1464,7 +1480,9 @@ namespace UI_Chat_App
             // Chuyển sang tab Add Friends
             TabControl.SelectedIndex = 1;
 
+
         }
+
 
     //    private async void CreateGroupButton_Click(object sender, RoutedEventArgs e)
     //    {
@@ -1496,7 +1514,12 @@ namespace UI_Chat_App
 
         private void AddGroupsButton_Click(object sender, RoutedEventArgs e)
         {
-            // Code xử lý khi nhấn nút thêm nhóm
+            // Chuyển sang tab "Add Groups"
+            if (TabControl != null && TabControl.Items.Count > 2)
+            {
+                // Tab thứ 3 (0 = Chat, 1 = AddFriends, 2 = AddGroups)
+                TabControl.SelectedIndex = 2;
+            }
         }
         private void ThumbtackButton_Click(object sender, RoutedEventArgs e)
         {
