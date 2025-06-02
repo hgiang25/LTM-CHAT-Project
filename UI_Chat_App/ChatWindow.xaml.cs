@@ -1957,6 +1957,10 @@ namespace UI_Chat_App
                 {
                     AllUsersListBox.ItemsSource = _allUsers;
                 }
+                else if (TabControl.SelectedIndex == 2) 
+                {
+                    GroupUserListBox.ItemsSource = _users;
+                }
 
                 // Đảm bảo giao diện cập nhật
                 SearchTextBox_TextChanged(null, null);

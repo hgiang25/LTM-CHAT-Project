@@ -750,7 +750,7 @@
                                          HorizontalContentAlignment="Stretch"
                                          SelectionMode="Multiple">  
                                     
-                                    <!--<ListBox.ItemContainerStyle>
+                                    <ListBox.ItemContainerStyle>
                                         <Style TargetType="ListBoxItem">
                                             <Setter Property="Background" Value="Transparent"/>
                                             <Setter Property="BorderBrush" Value="Transparent"/>
@@ -778,30 +778,27 @@
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto"/>
-                                                        --><!-- Checkbox --><!--
+                                                         
                                                         <ColumnDefinition Width="Auto"/>
-                                                        --><!-- Avatar --><!--
+                                                         
                                                         <ColumnDefinition Width="*"/>
-                                                        --><!-- Info --><!--
+                                                        
                                                     </Grid.ColumnDefinitions>
-
-                                                    --><!-- Tick --><!--
+                                                     
                                                     <CheckBox Grid.Column="0" VerticalAlignment="Center" Margin="5" IsChecked="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
-
-                                                    --><!-- Avatar --><!--
+                                                     
                                                     <Border Width="50" Height="50" CornerRadius="25" ClipToBounds="True" Grid.Column="1">
                                                         <Image Source="{Binding Avatar, Converter={StaticResource ImageUrlConverter}, FallbackValue='Icons/user.png'}"
                                                                 Width="50" Height="50" Stretch="UniformToFill"/>
                                                     </Border>
-
-                                                    --><!-- Tên --><!--
+                                                     
                                                     <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="10,0,0,0">
                                                         <TextBlock Text="{Binding DisplayName}" FontSize="16" FontWeight="SemiBold" Foreground="#333"/>
                                                     </StackPanel>
                                                 </Grid>
                                             </Border>
                                         </DataTemplate>
-                                    </ListBox.ItemTemplate>-->
+                                    </ListBox.ItemTemplate>
                                 </ListBox>
                             </ScrollViewer>
                         </TabItem>
