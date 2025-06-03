@@ -239,56 +239,58 @@ namespace UI_Chat_App
 
                 // ==== Load Friends ====
                 var friends = await _databaseService.GetFriendsAsync(App.CurrentUser.Id);
-                ObservableCollection<UserData> newUsers = new ObservableCollection<UserData>();
-                if (friends != null)
+                var newUsers = new ObservableCollection<UserData>();
+                foreach (var friend in friends ?? Enumerable.Empty<UserData>())
                 {
-                    foreach (var friend in friends)
+                    if (string.IsNullOrEmpty(friend.Avatar))
                     {
-                        if (string.IsNullOrEmpty(friend.Avatar))
-                        {
-                            friend.Avatar = "Icons/user.png";
-                            _ = _databaseService.SaveUserAsync(_idToken, friend);
-                        }
-                        newUsers.Add(friend);
+                        friend.Avatar = "Icons/user.png";
+                        _ = _databaseService.SaveUserAsync(_idToken, friend);
                     }
+                    newUsers.Add(friend);
                 }
 
                 // ==== Load Groups ====
                 var groups = await _databaseService.GetGroupsForUserAsync(App.CurrentUser.Id);
-                ObservableCollection<GroupData> newGroups = new ObservableCollection<GroupData>();
-                if (groups != null)
+                var newGroups = new ObservableCollection<GroupData>();
+                foreach (var group in groups ?? Enumerable.Empty<GroupData>())
                 {
-                    foreach (var group in groups)
+                    if (string.IsNullOrEmpty(group.Avatar))
                     {
-                        if (string.IsNullOrEmpty(group.Avatar))
-                        {
-                            group.Avatar = "Icons/group.png";
-                        }
-                        newGroups.Add(group);
+                        group.Avatar = "Icons/group.png";
                     }
+                    newGroups.Add(group);
                 }
 
-                // ==== UI Update ====
                 await Dispatcher.InvokeAsync(() =>
                 {
-                    // Update _users if changed
+                    // ==== Update _users nếu thay đổi ====
                     if (!_users.SequenceEqual(newUsers, new UserDataComparer()))
                     {
                         _users.Clear();
                         foreach (var user in newUsers) _users.Add(user);
                     }
 
-                    // Update _groups
-                    _groups.Clear();
-                    foreach (var group in newGroups) _groups.Add(group);
+                    // ==== Update _groups nếu thay đổi ====
+                    if (!_groups.SequenceEqual(newGroups, new GroupDataComparer()))
+                    {
+                        _groups.Clear();
+                        foreach (var group in newGroups) _groups.Add(group);
+                    }
 
-                    // Gộp chatroom
-                    _chatrooms.Clear();
-                    foreach (var user in _users) _chatrooms.Add(user);
-                    foreach (var group in _groups) _chatrooms.Add(group);
-                    UserListBox.ItemsSource = _chatrooms;
+                    // ==== Gộp _users + _groups vào _chatrooms ====
+                    var newChatrooms = new ObservableCollection<object>(_users.Cast<object>().Concat(_groups));
+                    if (!_chatrooms.SequenceEqual(newChatrooms, new ChatroomComparer()))
+                    {
+                        _chatrooms.Clear();
+                        foreach (var chatroom in newChatrooms) _chatrooms.Add(chatroom);
+                    }
 
-                    // Khôi phục lựa chọn nếu có
+                    // ==== Gán lại ItemSource nếu chưa gán ====
+                    if (UserListBox.ItemsSource != _chatrooms)
+                        UserListBox.ItemsSource = _chatrooms;
+
+                    // ==== Khôi phục lựa chọn ====
                     if (!string.IsNullOrEmpty(previouslySelectedChatroomId))
                     {
                         var itemToSelect = _chatrooms.FirstOrDefault(item =>
@@ -307,7 +309,7 @@ namespace UI_Chat_App
                                 ProfileAvatar.Source = (ImageSource)new ImageUrlConverter().Convert(selectedUser.Avatar, typeof(ImageSource), null, null);
                             }
                             else if (itemToSelect is GroupData selectedGroup)
-                            {                                                                
+                            {
                                 _selectedGroup = selectedGroup;
                                 _selectedUser = null;
                                 ProfileStatus.Text = $"Members: {selectedGroup.MemberCount}";
@@ -317,34 +319,29 @@ namespace UI_Chat_App
                     }
                 });
 
-                // ==== Load friend requests ====
+                // ==== Load Friend Requests (received) ====
                 var receivedRequests = await _databaseService.GetFriendRequestsAsync(App.CurrentUser.Id);
-                if (receivedRequests != null)
+                await Dispatcher.InvokeAsync(() =>
                 {
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        _friendRequests.Clear();
-                        foreach (var request in receivedRequests)
-                            _friendRequests.Add(request);
-                    });
-                }
+                    _friendRequests.Clear();
+                    foreach (var request in receivedRequests ?? Enumerable.Empty<FriendRequestWithUserInfo>())
+                        _friendRequests.Add(request);
+                });
 
+                // ==== Load Sent Requests ====
                 var sentRequests = await _databaseService.GetSentFriendRequestsAsync(App.CurrentUser.Id);
-                if (sentRequests != null)
+                await Dispatcher.InvokeAsync(() =>
                 {
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        _sentFriendRequests.Clear();
-                        foreach (var request in sentRequests)
-                            _sentFriendRequests.Add(request);
-                    });
-                }
+                    _sentFriendRequests.Clear();
+                    foreach (var request in sentRequests ?? Enumerable.Empty<FriendRequestWithUserInfo>())
+                        _sentFriendRequests.Add(request);
+                });
 
-                // ==== Load all users chưa là bạn ====
+                // ==== Load All Users (chưa là bạn) ====
                 var usersDict = await _databaseService.GetAllUsersAsync(_idToken);
                 var allUsers = usersDict.Values.Where(user => user.Id != App.CurrentUser.Id).ToList();
                 var friendIds = friends?.Select(f => f.Id).ToList() ?? new List<string>();
-                var nonFriends = allUsers.Where(friend => !friendIds.Contains(friend.Id)).ToList();
+                var nonFriends = allUsers.Where(user => !friendIds.Contains(user.Id)).ToList();
 
                 await Dispatcher.InvokeAsync(async () =>
                 {
@@ -359,15 +356,18 @@ namespace UI_Chat_App
                         _allUsers.Add(user);
                     }
 
+                    // Hiển thị danh sách phù hợp theo tab
                     if (TabControl.SelectedIndex == 0)
                     {
-                        UserListBox.ItemsSource = _chatrooms;
+                        if (UserListBox.ItemsSource != _chatrooms)
+                            UserListBox.ItemsSource = _chatrooms;
                     }
                     else if (TabControl.SelectedIndex == 1)
                     {
                         AllUsersListBox.ItemsSource = _allUsers;
                     }
 
+                    // Áp dụng tìm kiếm nếu có
                     if (!string.IsNullOrWhiteSpace(SearchTextBox.Text))
                     {
                         SearchTextBox_TextChanged(null, null);
@@ -376,9 +376,47 @@ namespace UI_Chat_App
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to refresh all: {ex.Message}");
+                Console.WriteLine($"Failed to refresh: {ex.Message}");
             }
         }
+
+        private class GroupDataComparer : IEqualityComparer<GroupData>
+        {
+            public bool Equals(GroupData x, GroupData y)
+            {
+                if (x == null || y == null) return false;
+                return x.GroupId == y.GroupId &&
+                       x.Name == y.Name &&
+                       x.Avatar == y.Avatar &&
+                       x.MemberCount == y.MemberCount;
+            }
+
+            public int GetHashCode(GroupData obj)
+            {
+                return obj.GroupId.GetHashCode();
+            }
+        }
+
+
+        public class ChatroomComparer : IEqualityComparer<object>
+        {
+            public bool Equals(object x, object y)
+            {
+                if (x is UserData ux && y is UserData uy)
+                    return ux.Id == uy.Id;
+                if (x is GroupData gx && y is GroupData gy)
+                    return gx.GroupId == gy.GroupId;
+                return false;
+            }
+
+            public int GetHashCode(object obj)
+            {
+                if (obj is UserData u) return u.Id.GetHashCode();
+                if (obj is GroupData g) return g.GroupId.GetHashCode();
+                return obj?.GetHashCode() ?? 0;
+            }
+        }
+
 
         // Thêm class UserDataComparer để so sánh danh sách bạn bè
         private class UserDataComparer : IEqualityComparer<UserData>
