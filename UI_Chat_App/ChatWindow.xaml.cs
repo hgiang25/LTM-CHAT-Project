@@ -22,6 +22,7 @@ using static Google.Cloud.Firestore.V1.StructuredAggregationQuery.Types.Aggregat
 using System.Windows.Controls.Primitives;
 using System.Net;
 using System.Windows.Media.Animation;
+using Google.Cloud.Firestore.V1;
 
 namespace UI_Chat_App
 {
@@ -30,12 +31,14 @@ namespace UI_Chat_App
         private readonly FirebaseDatabaseService _databaseService;
         private readonly FirebaseAuthService _authService;
         private ObservableCollection<UserData> _users; // Danh sách bạn bè
+        private ObservableCollection<GroupData> _groups; // Danh sách bạn bè
         private ObservableCollection<UserData> _allUsers; // Danh sách tất cả người dùng
         private ObservableCollection<FriendRequestWithUserInfo> _friendRequests; // Danh sách lời mời kết bạn
         private ObservableCollection<FriendRequestWithUserInfo> _sentFriendRequests; // Danh sách lời mời đã gửi
         private ObservableCollection<MessageData> _messages; // Danh sách tin nhắn
         private ObservableCollection<NotificationData> _notifications;
         private UserData _selectedUser;
+        private GroupData _selectedGroup;
         private string _currentChatRoomId;
         private bool _isSending = false;
         private string _idToken;
@@ -44,7 +47,9 @@ namespace UI_Chat_App
         private Timestamp? _lastMessageTimestamp;        // Lưu thời gian tin nhắn cuối cùng
         private DispatcherTimer _typingTimer;
         private bool _isTyping;
-        private FirestoreChangeListener _typingStatusListener;        
+        private FirestoreChangeListener _typingStatusListener;
+        public ObservableCollection<object> _chatrooms = new ObservableCollection<object>();
+
 
 
         // Thuộc tính công khai để truy cập _sentFriendRequests từ HasPendingRequestConverter
@@ -56,6 +61,7 @@ namespace UI_Chat_App
             _databaseService = new FirebaseDatabaseService();
             _authService = new FirebaseAuthService();
             _users = new ObservableCollection<UserData>();
+            _groups = new ObservableCollection<GroupData>();
             _allUsers = new ObservableCollection<UserData>();
             _friendRequests = new ObservableCollection<FriendRequestWithUserInfo>();
             _sentFriendRequests = new ObservableCollection<FriendRequestWithUserInfo>();
@@ -63,29 +69,20 @@ namespace UI_Chat_App
             _notifications = new ObservableCollection<NotificationData>();
             Loaded += ChatWindow_Loaded;
             Closing += Window_Closing;
-
+            _chatrooms = new ObservableCollection<object> { };
             // Timer cho bạn bè và lời mời
             _refreshTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromSeconds(15) // Cập nhật bạn bè/lời mời mỗi 60 giây
             };
             _refreshTimer.Tick += RefreshFriendsAndRequests_Tick;
-
-            // Timer riêng cho tin nhắn
-            //_messageRefreshTimer = new DispatcherTimer
-            //{
-            //    Interval = TimeSpan.FromSeconds(3) // Cập nhật tin nhắn mỗi 5 giây
-            //};
-            //_messageRefreshTimer.Tick += MessageRefreshTimer_Tick;
         }
 
         // Thay thế ChatWindow_Loaded
         private async void ChatWindow_Loaded(object sender, RoutedEventArgs e)
         {
             await InitializeChatAsync();
-            _refreshTimer.Start();
-            //_messageRefreshTimer.Start();            
-            //await _databaseService.GetMessagesAsync(_currentChatRoomId);                     
+            _refreshTimer.Start();                     
             await StartListeningForMessages(_currentChatRoomId);
         }
 
@@ -139,10 +136,9 @@ namespace UI_Chat_App
                     ProfileEmail.Text = $"Email: {App.CurrentUser.Email}";
                     ProfileStatus.Text = "Status: Online";
                     App.CurrentUser.RaisePropertyChanged(nameof(App.CurrentUser.Avatar));
-                });
-
+                });                
                 // Gán ItemsSource cho các ListBox
-                UserListBox.ItemsSource = _users;
+                UserListBox.ItemsSource = _chatrooms;
                 FriendRequestsListBox.ItemsSource = _friendRequests;
                 AllUsersListBox.ItemsSource = _allUsers;
 
@@ -168,7 +164,7 @@ namespace UI_Chat_App
 
 
                 // Tải dữ liệu ban đầu
-                await RefreshFriendsAndRequestsAsync();                
+                //await RefreshFriendsAndRequestsAsync();                
                 await LoadAllUsersAsync();
             }
             catch (Exception ex)
@@ -181,70 +177,147 @@ namespace UI_Chat_App
         private async void RefreshFriendsAndRequests_Tick(object sender, EventArgs e)
         {
             await RefreshFriendsAndRequestsAsync();
+            //await RefreshGroupsAsync();
+        }       
+
+        private async Task RefreshGroupsAsync()
+        {
+            try
+            {
+                // Lấy danh sách nhóm mà người dùng là thành viên
+                var groups = await _databaseService.GetGroupsForUserAsync(App.CurrentUser.Id);
+
+                if (groups != null)
+                {
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        _groups.Clear();
+                        foreach (var group in groups)
+                        {
+                            // Nếu chưa có avatar cho nhóm thì gán mặc định
+                            if (string.IsNullOrEmpty(group.Avatar))
+                            {
+                                group.Avatar = "Icons/group.png";
+                            }
+                            _groups.Add(group);
+                        }
+
+                        // Làm mới danh sách phòng chat tổng hợp (bạn bè + nhóm)
+                        _chatrooms.Clear();
+                        foreach (var user in _users)
+                        {
+                            _chatrooms.Add(user);
+                        }
+                        foreach (var group in _groups)
+                        {
+                            _chatrooms.Add(group);
+                        }
+
+                        // Áp dụng lại template selector
+                        UserListBox.ItemsSource = _chatrooms;
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to refresh groups: {ex.Message}");
+            }
         }
 
-        //private async void MessageRefreshTimer_Tick(object sender, EventArgs e)
-        //{
-        //    if (_selectedUser != null && !string.IsNullOrEmpty(_currentChatRoomId))
-        //    {
-        //        await RefreshMessagesAsync();                
-        //    }
-        //    await RefreshNotificationAsync();
-        //}
 
         private async Task RefreshFriendsAndRequestsAsync()
         {
             try
             {
-                // Lấy danh sách bạn bè
+                string previouslySelectedChatroomId = null;
+                object previouslySelectedItem = UserListBox.SelectedItem;
+
+                if (previouslySelectedItem is UserData u)
+                    previouslySelectedChatroomId = u.Id;
+                else if (previouslySelectedItem is GroupData g)
+                    previouslySelectedChatroomId = g.GroupId;
+
+                // ==== Load Friends ====
                 var friends = await _databaseService.GetFriendsAsync(App.CurrentUser.Id);
+                ObservableCollection<UserData> newUsers = new ObservableCollection<UserData>();
                 if (friends != null)
                 {
-                    await Dispatcher.InvokeAsync(() =>
+                    foreach (var friend in friends)
                     {
-                        var previouslySelectedUserId = _selectedUser?.Id;
-                        // Tạo danh sách tạm để so sánh
-                        var newUsers = new ObservableCollection<UserData>();
-                        foreach (var friend in friends)
+                        if (string.IsNullOrEmpty(friend.Avatar))
                         {
-                            if (string.IsNullOrEmpty(friend.Avatar))
-                            {
-                                friend.Avatar = "Icons/user.png";
-                                _databaseService.SaveUserAsync(_idToken, friend).ContinueWith(t =>
-                                {
-                                    if (t.IsFaulted)
-                                        Console.WriteLine($"Failed to save default avatar for friend {friend.Id}: {t.Exception.Message}");
-                                });
-                            }
-                            newUsers.Add(friend);
+                            friend.Avatar = "Icons/user.png";
+                            _ = _databaseService.SaveUserAsync(_idToken, friend);
                         }
-
-                        // Chỉ cập nhật _users nếu danh sách thay đổi
-                        if (!_users.SequenceEqual(newUsers, new UserDataComparer()))
-                        {
-                            _users.Clear();
-                            foreach (var user in newUsers)
-                            {
-                                _users.Add(user);
-                            }
-                        }
-
-                        // Cập nhật người dùng đang chọn mà không gây làm mới giao diện nhắn tin
-                        if (previouslySelectedUserId != null)
-                        {
-                            var userToSelect = _users.FirstOrDefault(u => u.Id == previouslySelectedUserId);
-                            if (userToSelect != null && userToSelect != UserListBox.SelectedItem)
-                            {
-                                UserListBox.SelectedItem = userToSelect;
-                                _selectedUser = userToSelect;
-                                ProfileStatus.Text = $"Status: {(_selectedUser.IsOnline ? "Online" : "Offline")}";
-                                ProfileAvatar.Source = (ImageSource)new ImageUrlConverter().Convert(_selectedUser.Avatar, typeof(ImageSource), null, null);
-                            }
-                        }
-                    });
+                        newUsers.Add(friend);
+                    }
                 }
 
-                // Lấy danh sách lời mời kết bạn (nhận được)
+                // ==== Load Groups ====
+                var groups = await _databaseService.GetGroupsForUserAsync(App.CurrentUser.Id);
+                ObservableCollection<GroupData> newGroups = new ObservableCollection<GroupData>();
+                if (groups != null)
+                {
+                    foreach (var group in groups)
+                    {
+                        if (string.IsNullOrEmpty(group.Avatar))
+                        {
+                            group.Avatar = "Icons/group.png";
+                        }
+                        newGroups.Add(group);
+                    }
+                }
+
+                // ==== UI Update ====
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    // Update _users if changed
+                    if (!_users.SequenceEqual(newUsers, new UserDataComparer()))
+                    {
+                        _users.Clear();
+                        foreach (var user in newUsers) _users.Add(user);
+                    }
+
+                    // Update _groups
+                    _groups.Clear();
+                    foreach (var group in newGroups) _groups.Add(group);
+
+                    // Gộp chatroom
+                    _chatrooms.Clear();
+                    foreach (var user in _users) _chatrooms.Add(user);
+                    foreach (var group in _groups) _chatrooms.Add(group);
+                    UserListBox.ItemsSource = _chatrooms;
+
+                    // Khôi phục lựa chọn nếu có
+                    if (!string.IsNullOrEmpty(previouslySelectedChatroomId))
+                    {
+                        var itemToSelect = _chatrooms.FirstOrDefault(item =>
+                            (item is UserData user && user.Id == previouslySelectedChatroomId) ||
+                            (item is GroupData group && group.GroupId == previouslySelectedChatroomId));
+
+                        if (itemToSelect != null)
+                        {
+                            UserListBox.SelectedItem = itemToSelect;
+
+                            if (itemToSelect is UserData selectedUser)
+                            {
+                                _selectedUser = selectedUser;
+                                _selectedGroup = null;
+                                ProfileStatus.Text = $"Status: {(selectedUser.IsOnline ? "Online" : "Offline")}";
+                                ProfileAvatar.Source = (ImageSource)new ImageUrlConverter().Convert(selectedUser.Avatar, typeof(ImageSource), null, null);
+                            }
+                            else if (itemToSelect is GroupData selectedGroup)
+                            {                                                                
+                                _selectedGroup = selectedGroup;
+                                _selectedUser = null;
+                                ProfileStatus.Text = $"Members: {selectedGroup.MemberCount}";
+                                ProfileAvatar.Source = (ImageSource)new ImageUrlConverter().Convert(selectedGroup.Avatar, typeof(ImageSource), null, null);
+                            }
+                        }
+                    }
+                });
+
+                // ==== Load friend requests ====
                 var receivedRequests = await _databaseService.GetFriendRequestsAsync(App.CurrentUser.Id);
                 if (receivedRequests != null)
                 {
@@ -252,13 +325,10 @@ namespace UI_Chat_App
                     {
                         _friendRequests.Clear();
                         foreach (var request in receivedRequests)
-                        {
                             _friendRequests.Add(request);
-                        }
                     });
                 }
 
-                // Lấy danh sách lời mời đã gửi
                 var sentRequests = await _databaseService.GetSentFriendRequestsAsync(App.CurrentUser.Id);
                 if (sentRequests != null)
                 {
@@ -266,18 +336,15 @@ namespace UI_Chat_App
                     {
                         _sentFriendRequests.Clear();
                         foreach (var request in sentRequests)
-                        {
                             _sentFriendRequests.Add(request);
-                        }
-                        Console.WriteLine($"Updated friend requests with {_friendRequests.Count} pending requests and {_sentFriendRequests.Count} sent requests.");
                     });
                 }
 
-                // Làm mới danh sách tất cả người dùng (chỉ hiển thị người chưa là bạn bè)
+                // ==== Load all users chưa là bạn ====
                 var usersDict = await _databaseService.GetAllUsersAsync(_idToken);
-                var allUsers = usersDict.Values.Where(u => u.Id != App.CurrentUser.Id).ToList();
+                var allUsers = usersDict.Values.Where(user => user.Id != App.CurrentUser.Id).ToList();
                 var friendIds = friends?.Select(f => f.Id).ToList() ?? new List<string>();
-                var nonFriends = allUsers.Where(u => !friendIds.Contains(u.Id)).ToList();
+                var nonFriends = allUsers.Where(friend => !friendIds.Contains(friend.Id)).ToList();
 
                 await Dispatcher.InvokeAsync(async () =>
                 {
@@ -292,18 +359,16 @@ namespace UI_Chat_App
                         _allUsers.Add(user);
                     }
 
-                    // Làm mới danh sách hiển thị dựa trên tab hiện tại và từ khóa tìm kiếm
                     if (TabControl.SelectedIndex == 0)
                     {
-                        UserListBox.ItemsSource = _users;
+                        UserListBox.ItemsSource = _chatrooms;
                     }
                     else if (TabControl.SelectedIndex == 1)
                     {
                         AllUsersListBox.ItemsSource = _allUsers;
                     }
 
-                    // Áp dụng lại tìm kiếm nếu có từ khóa
-                    if (!string.IsNullOrEmpty(SearchTextBox.Text.Trim()))
+                    if (!string.IsNullOrWhiteSpace(SearchTextBox.Text))
                     {
                         SearchTextBox_TextChanged(null, null);
                     }
@@ -311,7 +376,7 @@ namespace UI_Chat_App
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to refresh friends and requests: {ex.Message}");
+                Console.WriteLine($"Failed to refresh all: {ex.Message}");
             }
         }
 
@@ -988,77 +1053,102 @@ namespace UI_Chat_App
             {
                 Console.WriteLine($"Failed to load all users: {ex.Message}");
             }
-        }
+        }        
 
         private async void UserListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            var newSelectedUser = UserListBox.SelectedItem as UserData;
+            var selectedItem = UserListBox.SelectedItem;
 
-            if (newSelectedUser != null && (newSelectedUser != _selectedUser || _currentChatRoomId == null))
+            if (selectedItem is UserData newSelectedUser)
             {
-                _selectedUser = newSelectedUser;
-                bool areFriends = await _databaseService.AreFriendsAsync(App.CurrentUser.Id, _selectedUser.Id);
-                if (!areFriends)
+                // --- Xử lý chat cá nhân ---
+                if (newSelectedUser != _selectedUser || _currentChatRoomId == null)
                 {
-                    MessageBox.Show("You can only chat with friends. Please add this user as a friend first.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
-                    UserListBox.SelectedItem = null;
-                    _selectedUser = null;
-                    MessagesStackPanel.Children.Clear();
-                    ChatWithTextBlock.Text = "Chat with [User]";
-                    ProfileAvatar.Source = null;
-                    ProfileUsername.Text = "Username: [Username]";
-                    ProfileEmail.Text = "Email: user@example.com";
-                    ProfileStatus.Text = "Status: Offline";
-                    _currentChatRoomId = null;
+                    _selectedUser = newSelectedUser;
+                    _selectedGroup = null; // Hủy group nếu có
+
+                    bool areFriends = await _databaseService.AreFriendsAsync(App.CurrentUser.Id, _selectedUser.Id);
+                    if (!areFriends)
+                    {
+                        MessageBox.Show("You can only chat with friends. Please add this user as a friend first.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+                        ResetChatUI();
+                        return;
+                    }
+
+                    ChatWithTextBlock.Text = $"Chat with {_selectedUser.DisplayName}";
+                    ProfileUsername.Text = $"Username: {_selectedUser.DisplayName}";
+                    ProfileEmail.Text = $"Email: {_selectedUser.Email}";
+                    ProfileStatus.Text = $"Status: {(_selectedUser.IsOnline ? "Online" : "Offline")}";
+                    ProfileAvatar.Source = LoadAvatar(_selectedUser.Avatar);
+
+                    _currentChatRoomId = _databaseService.GenerateChatRoomId(App.CurrentUser.Id, _selectedUser.Id);
                     _lastMessageTimestamp = null;
-                    return;
-                }
+                    _messages.Clear();
+                    MessagesStackPanel.Children.Clear();
 
-                ChatWithTextBlock.Text = $"Chat with {_selectedUser.DisplayName}";
-                ProfileUsername.Text = $"Username: {_selectedUser.DisplayName}";
-                ProfileEmail.Text = $"Email: {_selectedUser.Email}";
-                ProfileStatus.Text = $"Status: {(_selectedUser.IsOnline ? "Online" : "Offline")}";
-
-                if (!string.IsNullOrEmpty(_selectedUser.Avatar))
-                {
-                    try
-                    {
-                        ProfileAvatar.Source = new BitmapImage(new Uri(_selectedUser.Avatar, UriKind.Absolute));
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Failed to load avatar for user {_selectedUser.DisplayName}: {ex.Message}");
-                        ProfileAvatar.Source = new BitmapImage(new Uri("pack://application:,,,/Icons/user.png", UriKind.Absolute));
-                    }
+                    await RefreshNotificationAsync();
+                    StartListeningToTyping();
+                    await _databaseService.StopListeningToMessagesAsync();
+                    await LoadInitialMessagesAsync(_currentChatRoomId);
+                    await StartListeningForMessages(_currentChatRoomId);
                 }
-                else
-                {
-                    ProfileAvatar.Source = new BitmapImage(new Uri("pack://application:,,,/Icons/user.png", UriKind.Absolute));
-                }
+            }
+            else if (selectedItem is GroupData selectedGroup)
+            {
+                // --- Xử lý chat nhóm ---
+                _selectedGroup = selectedGroup;
+                _selectedUser = null; // Hủy user nếu có
 
-                _currentChatRoomId = _databaseService.GenerateChatRoomId(App.CurrentUser.Id, _selectedUser.Id);
+                ChatWithTextBlock.Text = $"Group: {_selectedGroup.Name}";
+                ProfileUsername.Text = $"Group Name: {_selectedGroup.GroupId}";
+                ProfileEmail.Text = $"Created by: {_selectedGroup.CreatedBy}";
+                ProfileStatus.Text = $"Members: {_selectedGroup.MemberCount}";
+                ProfileAvatar.Source = LoadAvatar(_selectedGroup.Avatar);
+
+                _currentChatRoomId = _selectedGroup.GroupId;
                 _lastMessageTimestamp = null;
                 _messages.Clear();
                 MessagesStackPanel.Children.Clear();
 
-                await RefreshNotificationAsync();
-                StartListeningToTyping();
-                await _databaseService.StopListeningToMessagesAsync(); // Dừng lắng nghe cũ nếu có
-                await LoadInitialMessagesAsync(_currentChatRoomId);    // tải tin nhắn cũ
-                await StartListeningForMessages(_currentChatRoomId);   // bắt đầu lắng nghe tin nhắn mới
+                await _databaseService.StopListeningToMessagesAsync();
+                await LoadInitialMessagesAsync(_currentChatRoomId); // ID nhóm chính là chat room ID
+                await StartListeningForMessages(_currentChatRoomId);
             }
-            else if (newSelectedUser == null)
+            else
             {
-                _selectedUser = null;
-                MessagesStackPanel.Children.Clear();
-                ChatWithTextBlock.Text = "Chat with [User]";
-                ProfileAvatar.Source = null;
-                ProfileUsername.Text = "Username: [Username]";
-                ProfileEmail.Text = "Email: user@example.com";
-                ProfileStatus.Text = "Status: Offline";
-                _currentChatRoomId = null;
-                _lastMessageTimestamp = null;
+                ResetChatUI();
             }
+        }
+
+        private void ResetChatUI()
+        {
+            _selectedUser = null;
+            _selectedGroup = null;
+            UserListBox.SelectedItem = null;
+            MessagesStackPanel.Children.Clear();
+            ChatWithTextBlock.Text = "Chat with [User/Group]";
+            ProfileAvatar.Source = null;
+            ProfileUsername.Text = "Username: [Username]";
+            ProfileEmail.Text = "Email: user@example.com";
+            ProfileStatus.Text = "Status: Offline";
+            _currentChatRoomId = null;
+            _lastMessageTimestamp = null;
+        }
+
+        private BitmapImage LoadAvatar(string avatarUrl)
+        {
+            if (!string.IsNullOrEmpty(avatarUrl))
+            {
+                try
+                {
+                    return new BitmapImage(new Uri(avatarUrl, UriKind.Absolute));
+                }
+                catch
+                {
+                    // fall through
+                }
+            }
+            return new BitmapImage(new Uri("pack://application:,,,/Icons/user.png", UriKind.Absolute));
         }
 
 
@@ -1111,69 +1201,55 @@ namespace UI_Chat_App
 
         private async Task SendMessageAsync()
         {
-            if (_selectedUser == null)
-            {
-                MessageBox.Show("Please select a user to chat with.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
             string messageContent = MessageTextBox.Text.Trim();
             if (string.IsNullOrEmpty(messageContent)) return;
 
-            try
+            var timestamp = Timestamp.GetCurrentTimestamp();
+
+            if (_selectedUser == null && _selectedGroup == null)
             {
-                var timestamp = Google.Cloud.Firestore.Timestamp.GetCurrentTimestamp();
-                var message = new MessageData
-                {
-                    SenderId = App.CurrentUser.Id,
-                    ReceiverId = _selectedUser.Id,
-                    Content = messageContent,
-                    Timestamp = timestamp,
-                    MessageType = "Text",
-                    IsSeen = false
-                };
+                MessageBox.Show("Hãy chọn người dùng hoặc nhóm để gửi tin nhắn.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
 
-                // Lưu tin nhắn vào Firestore
-                await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
-                await _databaseService.SetTypingStatusAsync(App.CurrentUser.Id, _selectedUser.Id, false);
+            var message = new MessageData
+            {
+                SenderId = App.CurrentUser.Id,
+                ReceiverId = _selectedUser?.Id, // null nếu là nhóm
+                Content = messageContent,
+                Timestamp = timestamp,
+                MessageType = "Text",
+                IsSeen = false
+            };
 
-                await Dispatcher.InvokeAsync(() =>
+            await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (!_messages.Any(m => m.MessageId == message.MessageId))
                 {
-                    // Chỉ thêm tin nhắn nếu chưa tồn tại trong _messages
-                    if (!_messages.Any(m => m.MessageId == message.MessageId))
-                    {
-                        _messages.Add(message);
-                        var bubble = CreateMessageBubble(
-                            message.Content,
-                            message.Timestamp.Value.ToDateTime().ToLocalTime().ToShortTimeString(),
-                            true,
-                            message.IsSeen
-                        );
-                        MessagesStackPanel.Children.Add(bubble);
-                        MessagesScrollViewer.ScrollToEnd();
-                    }
-                    MessageTextBox.Text = string.Empty;
-                    _lastMessageTimestamp = message.Timestamp;
-                });
-                // 🔔 Gửi thông báo
-                try
-                {
-                    await _databaseService.SendNotificationAsync(_selectedUser.Id, App.CurrentUser.Id, messageContent);
+                    _messages.Add(message);
+                    var bubble = CreateMessageBubble(
+                        message.Content,
+                        message.Timestamp.HasValue? message.Timestamp.Value.ToDateTime().ToLocalTime().ToShortTimeString(): "Unknown time",
+                        true,
+                        message.IsSeen
+                    );
+                    MessagesStackPanel.Children.Add(bubble);
+                    MessagesScrollViewer.ScrollToEnd();
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Failed to send notification: {ex.Message}");
-                    // Có thể thông báo cho người dùng, nhưng không làm gián đoạn quy trình
-                }
-                //await Dispatcher.InvokeAsync(() => MessageTextBox.Text = string.Empty);
-                //await RefreshMessagesAsync();
+                MessageTextBox.Clear();
+                _lastMessageTimestamp = message.Timestamp;
+            });
+
+            if (_selectedUser != null)
+            {
+                // Gửi thông báo cho tin nhắn cá nhân
+                await _databaseService.SendNotificationAsync(_selectedUser.Id, App.CurrentUser.Id, messageContent);
                 await RefreshNotificationAsync();
             }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Failed to send message: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
         }
+
 
         private async void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
@@ -1372,6 +1448,7 @@ namespace UI_Chat_App
                     });
 
                     await RefreshFriendsAndRequestsAsync();
+                   // await RefreshGroupsAsync();
                     MessageBox.Show("Avatar updated successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
@@ -1515,30 +1592,51 @@ namespace UI_Chat_App
 
         private async void CreateGroupButton_Click(object sender, RoutedEventArgs e)
         {
-    //        var groupName = GroupNameTextBox.Text.Trim();
-    //        if (string.IsNullOrWhiteSpace(groupName))
-    //        {
-    //            MessageBox.Show("Vui lòng nhập tên nhóm.");
-    //            return;
-    //        }
+            var groupName = GroupNameTextBox.Text.Trim();
+            if (string.IsNullOrWhiteSpace(groupName))
+            {
+                MessageBox.Show("Vui lòng nhập tên nhóm.");
+                return;
+            }
 
-    //        var groupId = Guid.NewGuid().ToString();
+            var selectedUsers = GroupUserListBox.SelectedItems.Cast<UserData>().ToList();
+            if (selectedUsers.Count == 0)
+            {
+                if (MessageBox.Show("Bạn chưa chọn thành viên nào. Nhóm sẽ chỉ có bạn là admin. Tiếp tục?", "Xác nhận", MessageBoxButton.YesNo) == MessageBoxResult.No)
+                    return;
+            }
 
-    //        var groupData = new Dictionary<string, object>
-    //{
-    //    { "name", groupName },
-    //    { "createdBy", App.CurrentUser.Id },
-    //    { "createdAt", Timestamp.GetCurrentTimestamp() },
-    //    { "members", new Dictionary<string, object> { { App.CurrentUser.Id, "admin" } } }
-    //};
+            var memberIds = selectedUsers.Select(u => u.Id).ToList();
 
-    //        var firestore = _databaseService.GetDb(); // sửa từ DefaultInstance
-    //        var groupRef = firestore.Collection("groups").Document(groupId);
-    //        await groupRef.SetAsync(groupData);
+            CreateGroupButton.IsEnabled = false;
+            try
+            {
+                // (Tuỳ chọn) Kiểm tra nhóm trùng tên
+                // var existingGroups = await _firestoreDb.Collection("groups")
+                //     .WhereEqualTo("name", groupName).GetSnapshotAsync();
+                // if (existingGroups.Count > 0)
+                // {
+                //     MessageBox.Show("Tên nhóm đã tồn tại, vui lòng chọn tên khác.");
+                //     return;
+                // }
 
-    //        MessageBox.Show($"Tạo nhóm thành công!\nID nhóm: {groupId}");
-    //        this.Close();
+                var groupId = await _databaseService.CreateGroupAsync(groupName, App.CurrentUser.Id, memberIds);
+                MessageBox.Show($"Tạo nhóm thành công!\nID nhóm: {groupId}");
+
+                // (Tuỳ chọn mở chat nhóm hoặc cập nhật danh sách nhóm UI)
+
+                //this.Close();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Tạo nhóm thất bại: {ex.Message}");
+            }
+            finally
+            {
+                CreateGroupButton.IsEnabled = true;
+            }
         }
+
 
 
         private void AddGroupsButton_Click(object sender, RoutedEventArgs e)
@@ -1857,6 +1955,7 @@ namespace UI_Chat_App
                     MessageBox.Show("Friend request sent!", "Success");
                     // Làm mới dữ liệu và giao diện ngay lập tức
                     await RefreshFriendsAndRequestsAsync();
+                   // await RefreshGroupsAsync();
                     await Dispatcher.InvokeAsync(() =>
                     {
                         AllUsersListBox.ItemsSource = null;
@@ -1895,6 +1994,7 @@ namespace UI_Chat_App
 
                     // Làm mới dữ liệu và giao diện ngay lập tức
                     await RefreshFriendsAndRequestsAsync();
+                   // await RefreshGroupsAsync();
                     await Dispatcher.InvokeAsync(() =>
                     {
                         FriendRequestsListBox.ItemsSource = null;
@@ -1945,6 +2045,7 @@ namespace UI_Chat_App
 
                     // Làm mới dữ liệu và giao diện ngay lập tức
                     await RefreshFriendsAndRequestsAsync();
+                   // await RefreshGroupsAsync();
                     await Dispatcher.InvokeAsync(() =>
                     {
                         FriendRequestsListBox.ItemsSource = null;
@@ -1976,6 +2077,7 @@ namespace UI_Chat_App
 
                     // Làm mới dữ liệu và giao diện ngay lập tức
                     await RefreshFriendsAndRequestsAsync();
+                   // await RefreshGroupsAsync();
                     await Dispatcher.InvokeAsync(() =>
                     {
                         AllUsersListBox.ItemsSource = null;

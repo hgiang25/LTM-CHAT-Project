@@ -344,6 +344,7 @@
       <DependentUpon>ChatWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="Converters\BooleanConverters.cs" />
+    <Compile Include="Converters\MixedItemTemplateSelector .cs" />
     <Compile Include="Converters\HasPendingRequestConverter.cs" />
     <Compile Include="Converters\ImageUrlConverter.cs" />
     <Compile Include="Helpers\ConfigHelper.cs" />

@@ -816,107 +816,189 @@ namespace ChatApp.Services
         }
 
 
-    //    public async Task<string> CreateGroupAsync(string groupName, string creatorId)
-    //    {
-    //        var groupId = Guid.NewGuid().ToString();
+        public async Task<string> CreateGroupAsync(string groupName, string creatorId, List<string> memberIds)
+        {
+            var groupId = Guid.NewGuid().ToString();
 
-    //        var groupRef = _firestoreDb.Collection("groups").Document(groupId);
-    //        var groupData = new Dictionary<string, object>
-    //{
-    //    { "name", groupName },
-    //    { "createdBy", creatorId },
-    //    { "createdAt", Timestamp.GetCurrentTimestamp() },
-    //    { "members", new Dictionary<string, object> { { creatorId, "admin" } } }
-    //};
+            var members = new Dictionary<string, string>
+            {
+                [creatorId] = "admin"
+            };
 
-    //        await groupRef.SetAsync(groupData);
-    //        return groupId;
-    //    }
+            if (memberIds != null)
+            {
+                foreach (var id in memberIds)
+                {
+                    if (id != creatorId)
+                        members[id] = "member";
+                }
+            }
 
-    //    public async Task ApproveMemberAsync(string groupId, string userId)
-    //    {
-    //        var memberRef = _firestoreDb.Collection("groups").Document(groupId);
-    //        var updates = new Dictionary<string, object>
-    //{
-    //    { $"members.{userId}", "member" }
-    //};
-    //        await memberRef.UpdateAsync(updates);
-    //    }
+            var groupData = new Dictionary<string, object>
+                {
+                    { "name", groupName },
+                    { "createdBy", creatorId },
+                    { "createdAt", Timestamp.GetCurrentTimestamp() },
+                    { "avatar", "Icons/group.png" },
+                    { "members", members },
+                    { "memberCount", members.Count }
+                };
 
-    //    public async Task RemoveMemberAsync(string groupId, string userId)
-    //    {
-    //        var groupRef = _firestoreDb.Collection("groups").Document(groupId);
-    //        var updates = new Dictionary<FieldPath, object>
-    //{
-    //    { new FieldPath("members", userId), FieldValue.Delete }
-    //};
-    //        await groupRef.UpdateAsync(updates);
-    //    }
+            var groupRef = _firestoreDb.Collection("groups").Document(groupId);
+            await groupRef.SetAsync(groupData);
+
+            return groupId;
+        }
 
 
-    //    public async Task<List<GroupData>> SearchGroupsByNameAsync(string keyword)
-    //    {
-    //        var groupsRef = _firestoreDb.Collection("groups");
-    //        var query = await groupsRef
-    //            .WhereGreaterThanOrEqualTo("name", keyword)
-    //            .WhereLessThanOrEqualTo("name", keyword + "\uf8ff")
-    //            .GetSnapshotAsync();
+        public async Task<List<GroupData>> GetGroupsForUserAsync(string userId)
+        {
+            try
+            {
+                // Truy vấn tất cả nhóm mà "members" chứa userId
+                Query groupsQuery = _firestoreDb.Collection("groups")
+                    .WhereGreaterThanOrEqualTo($"members.{userId}", ""); // Chỉ cần key tồn tại trong map
 
-    //        var results = new List<GroupData>();
-    //        foreach (var doc in query.Documents)
-    //        {
-    //            var dict = doc.ToDictionary();
-    //            results.Add(new GroupData
-    //            {
-    //                GroupId = doc.Id,
-    //                Name = dict["name"] as string,
-    //                CreatedBy = dict["createdBy"] as string,
-    //                CreatedAt = dict.ContainsKey("createdAt") && dict["createdAt"] is Timestamp ts ? ts : default,
-    //                Members = dict.ContainsKey("members") ? ((Dictionary<string, object>)dict["members"])
-    //                    .ToDictionary(kv => kv.Key, kv => kv.Value.ToString()) : new Dictionary<string, string>()
-    //            });
-    //        }
+                QuerySnapshot snapshot = await groupsQuery.GetSnapshotAsync();
+                List<GroupData> groups = new List<GroupData>();
 
-    //        return results;
-    //    }
+                foreach (var doc in snapshot.Documents)
+                {
+                    Dictionary<string, object> data = doc.ToDictionary();
 
-    //    public async Task SendGroupMessageAsync(string groupId, MessageData message)
-    //    {
-    //        var messagesRef = _firestoreDb.Collection("groups").Document(groupId).Collection("messages");
-    //        var docRef = messagesRef.Document();
-    //        message.MessageId = docRef.Id;
-    //        message.Timestamp = Timestamp.GetCurrentTimestamp();
+                    var group = new GroupData
+                    {
+                        GroupId = doc.Id,
+                        Name = data.ContainsKey("name") ? data["name"].ToString() : "[No name]",
+                        Avatar = data.ContainsKey("avatar") ? data["avatar"].ToString() : "Icons/group.png",
+                        CreatedBy = data.ContainsKey("createdBy") ? data["createdBy"].ToString() : "[Unknown]",
+                        MemberCount = data.ContainsKey("memberCount") ? Convert.ToInt32(data["memberCount"]) : 0
+                    };
 
-    //        await docRef.SetAsync(message);
-    //    }
+                    groups.Add(group);
+                }
 
-    //    private FirestoreChangeListener _groupMessageListener;
+                Console.WriteLine($"[Firestore] Loaded {groups.Count} groups for user {userId}");
+                return groups;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to get groups for user: {ex.Message}", ex);
+            }
+        }
 
-    //    public async Task StartListeningToGroupMessagesAsync(string groupId, Action<MessageData> onMessageReceived)
-    //    {
-    //        if (_groupMessageListener != null)
-    //        {
-    //            await _groupMessageListener.StopAsync();
-    //            _groupMessageListener = null;
-    //        }
 
-    //        var messagesRef = _firestoreDb.Collection("groups").Document(groupId).Collection("messages")
-    //            .OrderBy("Timestamp");
 
-    //        _groupMessageListener = messagesRef.Listen(snapshot =>
-    //        {
-    //            foreach (var change in snapshot.Changes)
-    //            {
-    //                if (change.ChangeType == Google.Cloud.Firestore.DocumentChange.Type.Added)
-    //                {
-    //                    var message = change.Document.ConvertTo<MessageData>();
-    //                    onMessageReceived?.Invoke(message);
-    //                }
-    //            }
-    //        });
-    //    }
 
-    //    public FirestoreDb GetDb() => _firestoreDb;
+        public async Task SendGroupMessageAsync(string groupId, string senderId, string content)
+        {
+            var messageData = new Dictionary<string, object>
+            {
+                { "senderId", senderId },
+                { "content", content },
+                { "timestamp", Timestamp.GetCurrentTimestamp() }
+            };
+
+            var messagesRef = _firestoreDb
+                .Collection("groups")
+                .Document(groupId)
+                .Collection("messages");
+
+            await messagesRef.AddAsync(messageData);
+        }
+
+
+
+        //    public async Task ApproveMemberAsync(string groupId, string userId)
+        //    {
+        //        var memberRef = _firestoreDb.Collection("groups").Document(groupId);
+        //        var updates = new Dictionary<string, object>
+        //{
+        //    { $"members.{userId}", "member" }
+        //};
+        //        await memberRef.UpdateAsync(updates);
+        //    }
+
+        //    public async Task RemoveMemberAsync(string groupId, string userId)
+        //    {
+        //        var groupRef = _firestoreDb.Collection("groups").Document(groupId);
+        //        var updates = new Dictionary<FieldPath, object>
+        //{
+        //    { new FieldPath("members", userId), FieldValue.Delete }
+        //};
+        //        await groupRef.UpdateAsync(updates);
+        //    }
+
+
+        //    public async Task<List<GroupData>> SearchGroupsByNameAsync(string keyword)
+        //    {
+        //        var groupsRef = _firestoreDb.Collection("groups");
+        //        var query = await groupsRef
+        //            .WhereGreaterThanOrEqualTo("name", keyword)
+        //            .WhereLessThanOrEqualTo("name", keyword + "\uf8ff")
+        //            .GetSnapshotAsync();
+
+        //        var results = new List<GroupData>();
+        //        foreach (var doc in query.Documents)
+        //        {
+        //            var dict = doc.ToDictionary();
+        //            results.Add(new GroupData
+        //            {
+        //                GroupId = doc.Id,
+        //                Name = dict["name"] as string,
+        //                CreatedBy = dict["createdBy"] as string,
+        //                CreatedAt = dict.ContainsKey("createdAt") && dict["createdAt"] is Timestamp ts ? ts : default,
+        //                Members = dict.ContainsKey("members") ? ((Dictionary<string, object>)dict["members"])
+        //                    .ToDictionary(kv => kv.Key, kv => kv.Value.ToString()) : new Dictionary<string, string>()
+        //            });
+        //        }
+
+        //        return results;
+        //    }
+
+        //    public async Task SendGroupMessageAsync(string groupId, MessageData message)
+        //    {
+        //        var messagesRef = _firestoreDb.Collection("groups").Document(groupId).Collection("messages");
+        //        var docRef = messagesRef.Document();
+        //        message.MessageId = docRef.Id;
+        //        message.Timestamp = Timestamp.GetCurrentTimestamp();
+
+        //        await docRef.SetAsync(message);
+        //    }
+
+
+        private FirestoreChangeListener _groupMessageListener;
+
+        public void ListenToGroupMessages(string groupId, Action<MessageData> onMessageReceived)
+        {
+            var messagesRef = _firestoreDb
+                .Collection("groups")
+                .Document(groupId)
+                .Collection("messages")
+                .OrderBy("timestamp");
+
+            _groupMessageListener = messagesRef.Listen(snapshot =>
+            {
+                foreach (var change in snapshot.Changes)
+                {
+                    if (change.ChangeType == Google.Cloud.Firestore.DocumentChange.Type.Added)
+                    {
+                        var message = change.Document.ConvertTo<MessageData>();
+                        onMessageReceived?.Invoke(message); // Cập nhật UI
+                    }
+                }
+            });
+        }
+
+        // Gọi khi rời nhóm hoặc đổi nhóm
+        public void StopListeningToMessages()
+        {
+            _groupMessageListener?.StopAsync();
+            _groupMessageListener = null;
+        }
+
+
+        public FirestoreDb GetDb() => _firestoreDb;
 
 
     }
