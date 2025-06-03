@@ -1718,9 +1718,9 @@ namespace UI_Chat_App
 
         private async void ImageButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_selectedUser == null)
+            if (_selectedUser == null && _selectedGroup == null)
             {
-                MessageBox.Show("Please select a user to chat with.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Hãy chọn người dùng hoặc nhóm để gửi ảnh.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -1728,8 +1728,8 @@ namespace UI_Chat_App
             {
                 var openFileDialog = new Microsoft.Win32.OpenFileDialog
                 {
-                    Filter = "Image files (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg|All files (*.*)|*.*",
-                    Title = "Select an image to send"
+                    Filter = "Image files (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg",
+                    Title = "Chọn ảnh để gửi"
                 };
 
                 if (openFileDialog.ShowDialog() == true)
@@ -1738,15 +1738,16 @@ namespace UI_Chat_App
                     string imageUrl = await _databaseService.UploadFileToS3Async(filePath, "images");
                     if (string.IsNullOrEmpty(imageUrl))
                     {
-                        MessageBox.Show("Failed to upload image to S3.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        MessageBox.Show("Tải ảnh lên thất bại.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
-                    var timestamp = Google.Cloud.Firestore.Timestamp.GetCurrentTimestamp();
+
+                    var timestamp = Timestamp.GetCurrentTimestamp();
                     var message = new MessageData
                     {
                         SenderId = App.CurrentUser.Id,
-                        ReceiverId = _selectedUser.Id,
-                        Content = "Sent an image",
+                        ReceiverId = _selectedUser?.Id,
+                        Content = "Đã gửi một ảnh",
                         Timestamp = timestamp,
                         MessageType = "Image",
                         FileUrl = imageUrl
@@ -1754,31 +1755,25 @@ namespace UI_Chat_App
 
                     await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
                     AttachOptionsPanel.Visibility = Visibility.Collapsed;
-                    // 🔔 Gửi thông báo
-                    try
-                    {
+
+                    if (_selectedUser != null)
                         await _databaseService.SendNotificationAsync(_selectedUser.Id, App.CurrentUser.Id, "Image");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Failed to send notification: {ex.Message}");
-                        // Có thể thông báo cho người dùng, nhưng không làm gián đoạn quy trình
-                    }
-                   // await RefreshMessagesAsync();
+
                     await RefreshNotificationAsync();
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to send image: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Gửi ảnh thất bại: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
+
         private async void DownloadButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_selectedUser == null)
+            if (_selectedUser == null && _selectedGroup == null)
             {
-                MessageBox.Show("Please select a user to chat with.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Hãy chọn người dùng hoặc nhóm để gửi file.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -1787,7 +1782,7 @@ namespace UI_Chat_App
                 var openFileDialog = new Microsoft.Win32.OpenFileDialog
                 {
                     Filter = "All files (*.*)|*.*",
-                    Title = "Select a file to send"
+                    Title = "Chọn file để gửi"
                 };
 
                 if (openFileDialog.ShowDialog() == true)
@@ -1797,15 +1792,16 @@ namespace UI_Chat_App
                     string fileUrl = await _databaseService.UploadFileToS3Async(filePath, "files");
                     if (string.IsNullOrEmpty(fileUrl))
                     {
-                        MessageBox.Show("Failed to upload file to S3.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        MessageBox.Show("Tải file lên thất bại.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
-                    var timestamp = Google.Cloud.Firestore.Timestamp.GetCurrentTimestamp();
+
+                    var timestamp = Timestamp.GetCurrentTimestamp();
                     var message = new MessageData
                     {
                         SenderId = App.CurrentUser.Id,
-                        ReceiverId = _selectedUser.Id,
-                        Content = $"Sent a file: {fileName}",
+                        ReceiverId = _selectedUser?.Id,
+                        Content = $"Đã gửi file: {fileName}",
                         Timestamp = timestamp,
                         MessageType = "File",
                         FileUrl = fileUrl,
@@ -1814,21 +1810,25 @@ namespace UI_Chat_App
 
                     await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
                     AttachOptionsPanel.Visibility = Visibility.Collapsed;
-                   // await RefreshMessagesAsync();
+
+                    if (_selectedUser != null)
+                        await _databaseService.SendNotificationAsync(_selectedUser.Id, App.CurrentUser.Id, "File");
+
                     await RefreshNotificationAsync();
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to send file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Gửi file thất bại: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
+
         private async void VoiceRecordButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_selectedUser == null)
+            if (_selectedUser == null && _selectedGroup == null)
             {
-                MessageBox.Show("Please select a user to chat with.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Hãy chọn người dùng hoặc nhóm để gửi tin nhắn thoại.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -1844,8 +1844,7 @@ namespace UI_Chat_App
                 };
 
                 waveIn.StartRecording();
-                MessageBox.Show("Recording... Press OK to stop.", "Recording", MessageBoxButton.OK);
-
+                MessageBox.Show("Đang ghi âm... Nhấn OK để dừng.", "Ghi âm", MessageBoxButton.OK);
                 waveIn.StopRecording();
                 writer.Close();
                 waveIn.Dispose();
@@ -1853,15 +1852,16 @@ namespace UI_Chat_App
                 string voiceUrl = await _databaseService.UploadFileToS3Async(tempFilePath, "voice");
                 if (string.IsNullOrEmpty(voiceUrl))
                 {
-                    MessageBox.Show("Failed to upload voice message to S3.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show("Tải tin nhắn thoại thất bại.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
-                var timestamp = Google.Cloud.Firestore.Timestamp.GetCurrentTimestamp();
+
+                var timestamp = Timestamp.GetCurrentTimestamp();
                 var message = new MessageData
                 {
                     SenderId = App.CurrentUser.Id,
-                    ReceiverId = _selectedUser.Id,
-                    Content = "Sent a voice message",
+                    ReceiverId = _selectedUser?.Id,
+                    Content = "Đã gửi một tin nhắn thoại",
                     Timestamp = timestamp,
                     MessageType = "Voice",
                     FileUrl = voiceUrl
@@ -1869,25 +1869,19 @@ namespace UI_Chat_App
 
                 await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
                 File.Delete(tempFilePath);
-                // 🔔 Gửi thông báo
-                try
-                {
-                    await _databaseService.SendNotificationAsync(_selectedUser.Id, App.CurrentUser.Id, "Voice");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Failed to send notification: {ex.Message}");
-                    // Có thể thông báo cho người dùng, nhưng không làm gián đoạn quy trình
-                }
                 AttachOptionsPanel.Visibility = Visibility.Collapsed;
-               // await RefreshMessagesAsync();
+
+                if (_selectedUser != null)
+                    await _databaseService.SendNotificationAsync(_selectedUser.Id, App.CurrentUser.Id, "Voice");
+
                 await RefreshNotificationAsync();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to send voice message: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Gửi tin nhắn thoại thất bại: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
 
         private void LikeButton_Click(object sender, RoutedEventArgs e)
         {
@@ -1897,50 +1891,43 @@ namespace UI_Chat_App
 
         private async void EmojiButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_selectedUser == null)
+            if (_selectedUser == null && _selectedGroup == null)
             {
-                MessageBox.Show("Please select a user to chat with.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Hãy chọn người dùng hoặc nhóm để gửi emoji.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             try
             {
                 var button = sender as Button;
-                string emojiKey = button?.Tag as string; // VD: "cuoi"                
+                string emojiKey = button?.Tag as string;
                 if (!string.IsNullOrEmpty(emojiKey))
                 {
-                    var timestamp = Google.Cloud.Firestore.Timestamp.GetCurrentTimestamp();
+                    var timestamp = Timestamp.GetCurrentTimestamp();
                     var message = new MessageData
                     {
                         SenderId = App.CurrentUser.Id,
-                        ReceiverId = _selectedUser.Id,
-                        Content = emojiKey, // chính là tên ảnh
+                        ReceiverId = _selectedUser?.Id,
+                        Content = emojiKey,
                         Timestamp = timestamp,
-                        MessageType = "Emoji" // dùng để phân biệt với Image
+                        MessageType = "Emoji"
                     };
 
                     await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
                     EmojiPopup.IsOpen = false;
-                    // 🔔 Gửi thông báo
-                    try
-                    {
+
+                    if (_selectedUser != null)
                         await _databaseService.SendNotificationAsync(_selectedUser.Id, App.CurrentUser.Id, "Emoji");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Failed to send notification: {ex.Message}");
-                        // Có thể thông báo cho người dùng, nhưng không làm gián đoạn quy trình
-                    }
-                    //EmojiPanel.Visibility = Visibility.Collapsed;
-                    //await RefreshMessagesAsync();
+
                     await RefreshNotificationAsync();
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to send emoji: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Gửi emoji thất bại: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
 
         private async void AddFriend_Click(object sender, RoutedEventArgs e)
         {
