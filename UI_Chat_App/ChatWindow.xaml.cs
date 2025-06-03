@@ -21,6 +21,7 @@ using Google.Cloud.Firestore;
 using static Google.Cloud.Firestore.V1.StructuredAggregationQuery.Types.Aggregation.Types;
 using System.Windows.Controls.Primitives;
 using System.Net;
+using System.Windows.Media.Animation;
 
 namespace UI_Chat_App
 {
@@ -1483,6 +1484,34 @@ namespace UI_Chat_App
 
         }
 
+        private void GroupNameTextBox_Loaded(object sender, RoutedEventArgs e)
+        {
+            var tb = sender as TextBox;
+            if (string.IsNullOrEmpty(tb.Text))
+                tb.Text = tb.Tag.ToString();
+            tb.Foreground = Brushes.Gray;
+        }
+
+        private void GroupNameTextBox_GotFocus(object sender, RoutedEventArgs e)
+        {
+            var tb = sender as TextBox;
+            if (tb.Text == tb.Tag.ToString())
+            {
+                tb.Text = "";
+                tb.Foreground = Brushes.Black;
+            }
+        }
+
+        private void GroupNameTextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var tb = sender as TextBox;
+            if (string.IsNullOrWhiteSpace(tb.Text))
+            {
+                tb.Text = tb.Tag.ToString();
+                tb.Foreground = Brushes.Gray;
+            }
+        }
+
 
         private async void CreateGroupButton_Click(object sender, RoutedEventArgs e)
         {
@@ -1534,13 +1563,44 @@ namespace UI_Chat_App
             // Chuyển sang tab Chat
             TabControl.SelectedIndex = 0;
         }
-        private void Optional_Click(object sender, RoutedEventArgs e)
+
+        private bool _isUserProfileVisible = false;
+
+        private async void Optional_Click(object sender, RoutedEventArgs e)
         {
-            // Code xử lý khi nhấn nút xem thêm người dùng
+            if (!_isUserProfileVisible)
+            {
+                // Hiện lên
+                UserProfilePanel.Visibility = Visibility.Visible;
+                UserProfileColumn.Width = new GridLength(230);
+
+                var showStoryboard = (Storyboard)this.Resources["SlideInUserProfile"];
+                showStoryboard.Begin(UserProfilePanel);
+
+                _isUserProfileVisible = true;
+            }
+            else
+            {
+                // Chạy ẩn
+                var hideStoryboard = (Storyboard)this.Resources["SlideOutUserProfile"];
+                hideStoryboard.Begin(UserProfilePanel);
+
+                // Đợi animation hoàn tất rồi ẩn
+                await Task.Delay(200);
+                UserProfilePanel.Visibility = Visibility.Collapsed;
+                UserProfileColumn.Width = new GridLength(0);
+
+                _isUserProfileVisible = false;
+            }
         }
+        
+        
+        private bool isSearchVisible = false;
         private void SearchButtonChat_Click(object sender, RoutedEventArgs e)
         {
             // Code xử lý khi nhấn nút tìm kiếm trong chat
+            isSearchVisible = !isSearchVisible;
+            SearchBoxContainer.Visibility = isSearchVisible ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void VoiceCallButton_Click(object sender, RoutedEventArgs e)

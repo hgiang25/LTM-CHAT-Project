@@ -10,6 +10,82 @@
         WindowStartupLocation="CenterScreen" MouseLeftButtonDown="Window_MouseLeftButtonDown"
         ResizeMode="CanResize">
     <Window.Resources>
+        <!-- Animations -->
+        <Storyboard x:Key="FadeInStoryboard">
+            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                             From="0" To="1" Duration="0:0:0.3"/>
+        </Storyboard>
+
+        <Storyboard x:Key="SlideInFromRight">
+            <ThicknessAnimation Storyboard.TargetProperty="Margin"
+                                From="30,0,0,0" To="0" Duration="0:0:0.3"/>
+        </Storyboard>
+
+        <Style x:Key="AnimatedBorderStyle" TargetType="Border">
+            <Style.Triggers>
+                <EventTrigger RoutedEvent="Loaded">
+                    <BeginStoryboard Storyboard="{StaticResource FadeInStoryboard}"/>
+                </EventTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="AnimatedPanelStyle" TargetType="StackPanel">
+            <Style.Triggers>
+                <EventTrigger RoutedEvent="Loaded">
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                             From="0" To="1" Duration="0:0:0.3"/>
+                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                                             From="10" To="0" Duration="0:0:0.3"/>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </EventTrigger>
+            </Style.Triggers>
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <TranslateTransform Y="0"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+
+            <!-- Animation for user list item -->
+        <Style x:Key="UserListItemAnimatedStyle" TargetType="ListBoxItem">
+            <Setter Property="Opacity" Value="0"/>
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <TranslateTransform X="-30"/>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <EventTrigger RoutedEvent="Loaded">
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                             From="0" To="1" Duration="0:0:0.4"/>
+                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                             From="-30" To="0" Duration="0:0:0.4"/>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </EventTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Animation for user profile panel -->
+        <Storyboard x:Key="SlideInUserProfile">
+            <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.3"/>
+            <ThicknessAnimation Storyboard.TargetProperty="Margin" From="30,0,10,10" To="10" Duration="0:0:0.3"/>
+        </Storyboard>
+
+        <Storyboard x:Key="HideUserProfile">
+            <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0" Duration="0:0:0.2"/>
+        </Storyboard>
+
+        <Storyboard x:Key="SlideOutUserProfile">
+            <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0" Duration="0:0:0.2"/>
+            <ThicknessAnimation Storyboard.TargetProperty="Margin" From="10" To="30,10,10,10" Duration="0:0:0.2"/>
+        </Storyboard>
 
         <!-- Thêm ImageUrlConverter vào Resources -->
         <converters:ImageUrlConverter x:Key="ImageUrlConverter"/>
@@ -155,6 +231,7 @@
                     <DropShadowEffect BlurRadius="10" ShadowDepth="2" Color="Gray" Opacity="0.2"/>
                 </Border.Effect>
                 <Grid>
+                    
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
@@ -183,46 +260,46 @@
                     <!-- Popup và nút More Options -->
                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
                         <Button x:Name="MoreOptionsButton"
-            Width="30" Height="30"
-            Background="Transparent"
-            BorderBrush="Transparent"
-            Click="MoreOptionsButton_Click"
-            ToolTip="More Options"
+                                Width="30" Height="30"
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                Click="MoreOptionsButton_Click"
+                                ToolTip="More Options"
                                 Style="{StaticResource WindowButtonStyle}">
                             <Image Source="Icons/more_options.png" Width="20" Height="20"/>
                         </Button>
 
                         <Popup x:Name="DeletePopup"
-           Placement="Top"
-           PlacementTarget="{Binding ElementName=MoreOptionsButton}"
-           StaysOpen="False"
-           AllowsTransparency="True">
+                               Placement="Top"
+                               PlacementTarget="{Binding ElementName=MoreOptionsButton}"
+                               StaysOpen="False"
+                               AllowsTransparency="True">
                             <Border Background="White" CornerRadius="8" Padding="5" BorderBrush="LightGray" BorderThickness="1">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" >
                                     <!-- Nút Trash -->
                                     <Button Width="30" Height="30"
-            Background="Transparent"
-            BorderBrush="Transparent"
-            Click="DeleteUserButton_Click"
-            Style="{StaticResource WindowButtonStyle}">
+                                            Background="Transparent"
+                                            BorderBrush="Transparent"
+                                            Click="DeleteUserButton_Click"
+                                            Style="{StaticResource WindowButtonStyle}">             
                                         <Image Source="Icons/trash.png" Width="20" Height="20"/>
                                     </Button>
 
                                     <!-- Nút Thumbtack -->
                                     <Button Width="30" Height="30"
-            Background="Transparent"
-            BorderBrush="Transparent"
-            Click="ThumbtackButton_Click"
-            Style="{StaticResource WindowButtonStyle}">
+                                            Background="Transparent"
+                                            BorderBrush="Transparent"
+                                            Click="ThumbtackButton_Click"
+                                            Style="{StaticResource WindowButtonStyle}">     
                                         <Image Source="Icons/thumbtack.png" Width="20" Height="20"/>
                                     </Button>
 
                                     <!-- Nút Block -->
                                     <Button Width="30" Height="30"
-            Background="Transparent"
-            BorderBrush="Transparent"
-            Click="BlockUserButton_Click"
-            Style="{StaticResource WindowButtonStyle}">
+                                            Background="Transparent"
+                                            BorderBrush="Transparent"
+                                            Click="BlockUserButton_Click"
+                                            Style="{StaticResource WindowButtonStyle}">     
                                         <Image Source="Icons/block.png" Width="20" Height="20"/>
                                     </Button>
                                 </StackPanel>
@@ -274,15 +351,19 @@
     </Window.Resources>
     <Border Background="DarkGray" CornerRadius="30">
         <Grid>
+            <Grid.Triggers>
+                <EventTrigger RoutedEvent="Loaded">
+                    <BeginStoryboard Storyboard="{StaticResource FadeInStoryboard}"/>
+                </EventTrigger>
+            </Grid.Triggers>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="280"/>
-
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="230"/>
+                <ColumnDefinition x:Name="UserProfileColumn" Width="0"/>
             </Grid.ColumnDefinitions>
 
             <!-- Các nút điều khiển cửa sổ -->
@@ -420,14 +501,14 @@
                             </TabItem.Header>
                             <!-- Nội dung tab Chat -->
                             <ListBox x:Name="UserListBox" Style="{StaticResource RoundedListBoxStyle}" 
-         ItemsSource="{Binding Friends, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" 
-         ItemTemplate="{StaticResource UserBoxTemplate}" 
-         SelectionChanged="UserListBox_SelectionChanged"
-         HorizontalContentAlignment="Stretch">
+                                     ItemsSource="{Binding Friends, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" 
+                                     ItemTemplate="{StaticResource UserBoxTemplate}" 
+                                     SelectionChanged="UserListBox_SelectionChanged"
+                                     HorizontalContentAlignment="Stretch">  
 
                                 <ListBox.ItemContainerStyle>
-                                    <Style TargetType="ListBoxItem">
-                                        <Setter Property="Background" Value="Transparent"/>
+                                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource UserListItemAnimatedStyle}">
+                                    <Setter Property="Background" Value="Transparent"/>
                                         <Setter Property="BorderBrush" Value="Transparent"/>
                                         <Setter Property="BorderThickness" Value="0"/>
                                         <Setter Property="Padding" Value="0"/>
@@ -457,8 +538,8 @@
                                 <StackPanel>
                                     <ListBox x:Name="AllUsersListBox" Style="{StaticResource RoundedListBoxStyle}">
                                         <ListBox.ItemContainerStyle>
-                                            <Style TargetType="ListBoxItem">
-                                                <Setter Property="Background" Value="Transparent"/>
+                                            <Style TargetType="ListBoxItem" BasedOn="{StaticResource UserListItemAnimatedStyle}">
+                                            <Setter Property="Background" Value="Transparent"/>
                                                 <Setter Property="BorderBrush" Value="Transparent"/>
                                                 <Setter Property="BorderThickness" Value="0"/>
                                                 <Setter Property="Padding" Value="0"/>
@@ -755,26 +836,31 @@
                                 </Grid.RowDefinitions>
 
                                 <!-- Tên nhóm -->
-                                <TextBox x:Name="GroupNameTextBox"
-                                         Grid.Row="0"
-                                         Height="40"
-                                         Margin="0,0,0,10"
-                                         Padding="10"
-                                         FontSize="14"
-                                         BorderBrush="#CCC"
-                                         BorderThickness="1"
-                                         Background="White"
-                                         HorizontalAlignment="Stretch"/>
+                                    <Border Grid.Row="0" CornerRadius="8" BorderBrush="#CCCCCC" BorderThickness="1" Background="White" Margin="0,0,0,10">
+                                        <TextBox x:Name="GroupNameTextBox"
+                                                 FontSize="14"
+                                                 Background="Transparent"
+                                                 BorderThickness="0"
+                                                 Padding="10"
+                                                 Height="40"
+                                                 VerticalContentAlignment="Center"
+                                                 Text=""
+                                                 Foreground="Black"
+                                                 Tag="Group Name..."
+                                                 Loaded="GroupNameTextBox_Loaded"
+                                                 GotFocus="GroupNameTextBox_GotFocus"
+                                                 LostFocus="GroupNameTextBox_LostFocus"/>   
+                                    </Border>
 
-                                <!-- Danh sách bạn bè -->
+                                    <!-- Danh sách bạn bè -->
                                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <ListBox x:Name="GroupUserListBox"
-                     Style="{StaticResource RoundedListBoxStyle}"
-                     HorizontalContentAlignment="Stretch"
-                     SelectionMode="Multiple">
+                                                 Style="{StaticResource RoundedListBoxStyle}"
+                                                 HorizontalContentAlignment="Stretch"
+                                                 SelectionMode="Multiple">
 
                                         <ListBox.ItemContainerStyle>
-                                            <Style TargetType="ListBoxItem">
+                                                <Style TargetType="ListBoxItem" BasedOn="{StaticResource UserListItemAnimatedStyle}" >
                                                 <Setter Property="Background" Value="Transparent"/>
                                                 <Setter Property="BorderBrush" Value="Transparent"/>
                                                 <Setter Property="BorderThickness" Value="0"/>
@@ -823,16 +909,46 @@
                                 </ScrollViewer>
 
                                 <!-- Nút tạo nhóm -->
-                                <Button x:Name="CreateGroupButton"
-                                        Grid.Row="2"
-                                        Content="Tạo nhóm"
-                                        HorizontalAlignment="Right"
-                                        Width="100"
-                                        Height="35"
-                                        Margin="0,10,0,0"
-                                        Click="CreateGroupButton_Click"
-                                        Style="{StaticResource WindowButtonStyle}"/>
-                            </Grid>
+                                    <Button x:Name="CreateGroupButton"
+                                            Grid.Row="2"
+                                            Content="Create Group"
+                                            Width="120"
+                                            Height="40"
+                                            HorizontalAlignment="Right"
+                                            Margin="0,10,0,0"
+                                            Foreground="White"
+                                            FontWeight="SemiBold"
+                                            FontSize="14"
+                                            Cursor="Hand"
+                                            Background="#4CAF50"
+                                            BorderBrush="#4CAF50"
+                                            BorderThickness="0"
+                                            Click="CreateGroupButton_Click">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="{TemplateBinding Background}" 
+                                CornerRadius="20" 
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                BorderBrush="{TemplateBinding BorderBrush}">
+                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                            </Border>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#45A049"/>
+                                                        <Setter Property="BorderBrush" Value="#45A049"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+
+                                </Grid>
                             </Border>
                         </TabItem>
 
@@ -844,7 +960,7 @@
 
             <GridSplitter Grid.Column="0"
               Grid.Row="1"
-              Width="1"
+              Width="10"
               Height="Auto"
               Background="Transparent"
               ResizeBehavior="CurrentAndNext"
@@ -864,22 +980,82 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Tiêu đề khu vực chat -->
-                    <TextBlock x:Name="ChatWithTextBlock" Grid.Row="0" Grid.Column="0" Text="Chat with [User]" FontSize="20" FontWeight="Bold" Foreground="Black" Margin="10"/>
-                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10">
-                        <TextBox x:Name="ChatSearchTextBox" Width="200" Visibility="Collapsed" Style="{StaticResource SearchTextBoxStyle}"/>
-                        <Button x:Name="SearchChatButton" Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="SearchButtonChat_Click" Style="{StaticResource WindowButtonStyle}">
-                            <Image Source="Icons/search.png" Width="20" Height="20"/>
-                        </Button>
-                        <Button Width="40" Height="40" Background="Transparent" BorderBrush="Transparent" Margin="0,0,10,0" Click="VoiceCallButton_Click" Style="{StaticResource WindowButtonStyle}">
-                            <Image Source="Icons/voicecall.png" Width="20" Height="20"/>
-                        </Button>
-                        <Button Width="40" Height="40" Background="Transparent" BorderBrush="Transparent" Margin="0,0,10,0" Click="VideoCallButton_Click" Style="{StaticResource WindowButtonStyle}">
-                            <Image Source="Icons/video_call.png" Width="20" Height="20"/>
-                        </Button>
-                        <Button Width="40" Height="40" Background="Transparent" BorderBrush="Transparent" Margin="0,0,10,0" Click="Optional_Click" Style="{StaticResource WindowButtonStyle}">
-                            <Image Source="Icons/optional.png" Width="20" Height="20"/>
-                        </Button>
-                    </StackPanel>
+                    <Grid Grid.Row="0" Grid.ColumnSpan="2" Margin="10,10,10,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <!-- Chat with ... -->
+                            <ColumnDefinition Width="*"/>
+                            <!-- Search TextBox -->
+                            <ColumnDefinition Width="Auto"/>
+                            <!-- Buttons -->
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Chat with User -->
+                        <TextBlock x:Name="ChatWithTextBlock"
+                                   Grid.Column="0"
+                                   Text="Chat"
+                                   FontSize="20"
+                                   FontWeight="Bold"
+                                   Foreground="Black"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,10,0"/> 
+
+                        <!-- Search TextBox -->
+                        <Border x:Name="SearchBoxContainer"
+                                Grid.Column="1"
+                                Height="30"
+                                CornerRadius="15"
+                                Background="White"
+                                VerticalAlignment="Center"
+                                Margin="0,0,10,0"
+                                Visibility="Collapsed"
+                                BorderBrush="#CCC"
+                                BorderThickness="1">
+                            <Border.RenderTransform>
+                                <ScaleTransform ScaleX="0" ScaleY="1"/>
+                            </Border.RenderTransform>
+                            <Border.Triggers>
+                                <EventTrigger RoutedEvent="Border.Loaded">
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetProperty="RenderTransform.(ScaleTransform.ScaleX)"
+                                     To="1" Duration="0:0:0.3" AccelerationRatio="0.3" DecelerationRatio="0.3"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </EventTrigger>
+                            </Border.Triggers>
+                            <Grid>
+                                <TextBox x:Name="ChatSearchTextBox"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         FontSize="13"
+                                         Padding="10,0"
+                                         VerticalAlignment="Center"
+                                         Foreground="Black"
+                                         Text=""
+                                         Tag="Search..."
+                                         Width="Auto"
+                                         HorizontalAlignment="Stretch"/>        
+                            </Grid>
+                        </Border>
+
+                        <!-- Icon Buttons -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
+                            <Button x:Name="SearchChatButton" Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="SearchButtonChat_Click" Style="{StaticResource WindowButtonStyle}">
+                                <Image Source="Icons/search.png" Width="20" Height="20"/>
+                            </Button>
+                            <Button Width="40" Height="40" Background="Transparent" BorderBrush="Transparent" Margin="0,0,5,0" Click="VoiceCallButton_Click" Style="{StaticResource WindowButtonStyle}">
+                                <Image Source="Icons/voicecall.png" Width="20" Height="20"/>
+                            </Button>
+                            <Button Width="40" Height="40" Background="Transparent" BorderBrush="Transparent" Margin="0,0,5,0" Click="VideoCallButton_Click" Style="{StaticResource WindowButtonStyle}">
+                                <Image Source="Icons/video_call.png" Width="20" Height="20"/>
+                            </Button>
+                            <Button Width="40" Height="40" Background="Transparent" BorderBrush="Transparent" Margin="0,0,5,0" Click="Optional_Click" Style="{StaticResource WindowButtonStyle}">
+                                <Image Source="Icons/optional.png" Width="20" Height="20"/>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+
 
                     <!-- Khu vực hiển thị tin nhắn -->
                     <ScrollViewer x:Name="MessagesScrollViewer" Grid.Row="1" Grid.ColumnSpan="2" VerticalScrollBarVisibility="Auto" Margin="10">
@@ -910,8 +1086,6 @@
                                     </Border>
                                 </Popup>
 
-
-                                <!-- Thêm EmojiPanel -->
 
                                 <!-- Attach Button -->
                                 <Button x:Name="AttachButton" Width="40" Height="40" Margin="5" Background="Transparent" BorderThickness="0" Click="AttachButton_Click" Style="{StaticResource WindowButtonStyle}">
@@ -982,17 +1156,27 @@
               ResizeDirection="Columns" Margin="0,10,0,0"/>
 
 
-            <!-- Cột hồ sơ người dùng -->
-            <Border Grid.Row="1" Grid.Column="2" Background="CadetBlue" CornerRadius="0,0,30,0" Margin="10">
+            <Border x:Name="UserProfilePanel"
+        Grid.Row="1"
+        Grid.Column="2"
+        Background="CadetBlue"
+        CornerRadius="0,0,30,0"
+        Margin="10"
+        Opacity="0"
+        Visibility="Collapsed">
+                <Border.Triggers>
+                    <EventTrigger RoutedEvent="Border.Loaded">
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                     From="0" To="1" Duration="0:0:0.3"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                </Border.Triggers>
+
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="10">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-
-                            <Button x:Name="UserPenButton" Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="UserPenButton_Click" Style="{StaticResource WindowButtonStyle}">
-                                <Image Source="Icons/user_pen.png" Width="20" Height="20"/>
-                            </Button>
-
-                        </StackPanel>
                         <TextBlock Text="User Profile" FontSize="24" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
                         <Image x:Name="ProfileAvatar" Width="100" Height="100" Margin="0,10,0,10" Cursor="Hand"/>
                         <TextBlock x:Name="ProfileUsername" Text="Username: [Username]" FontSize="16" Foreground="White" Margin="0,10,0,0"/>
@@ -1001,6 +1185,7 @@
                     </StackPanel>
                 </ScrollViewer>
             </Border>
+
         </Grid>
     </Border>
 </Window>
