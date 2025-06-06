@@ -936,24 +936,38 @@ namespace UI_Chat_App
             {
                 // --- Xử lý chat nhóm ---
                 _selectedGroup = selectedGroup;
+                _selectedUser = null;
                 _selectedUser = null; // Hủy user nếu có
                 var NameGroup = GetUserNameById(_selectedGroup.CreatedBy);
 
                 ChatWithTextBlock.Text = $"Group: {_selectedGroup.Name}";
+
+                // Ẩn UserProfilePanel, hiện GroupProfilePanel
+                UserProfilePanel.Visibility = Visibility.Collapsed;
+                GroupProfilePanel.Visibility = Visibility.Visible;
+                UserProfileColumn.Width = new GridLength(230); // nếu đang dùng Grid có 3 cột
+
+                // Cập nhật Group Profile UI
+                GroupProfileName.Text = _selectedGroup.Name;
+                GroupCreatedBy.Text = $"Created by: {_selectedGroup.CreatedBy}";
+                GroupMemberCount.Text = $"Members: {_selectedGroup.MemberCount}";
+                GroupProfileAvatar.Source = LoadAvatar(_selectedGroup.Avatar);
                 ProfileUsername.Text = $"Group Name: {_selectedGroup.Name}";
                 ProfileEmail.Text = $"Created by: {NameGroup}";
                 ProfileStatus.Text = $"Members: {_selectedGroup.MemberCount}";
                 ProfileAvatar.Source = LoadAvatar(_selectedGroup.Avatar);
 
+                // Xử lý chat nhóm
                 _currentChatRoomId = _selectedGroup.GroupId;
                 _lastMessageTimestamp = null;
                 _messages.Clear();
                 MessagesStackPanel.Children.Clear();
 
                 await _databaseService.StopListeningToMessagesAsync();
-                await LoadInitialMessagesAsync(_currentChatRoomId); // ID nhóm chính là chat room ID
+                await LoadInitialMessagesAsync(_currentChatRoomId);
                 await StartListeningForMessages(_currentChatRoomId);
             }
+
             else
             {
                 ResetChatUI();
@@ -1980,5 +1994,27 @@ namespace UI_Chat_App
             _typingTimer.Stop();
             _typingTimer.Start();
         }
+
+        private void ViewMembersButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedGroup != null && _selectedGroup.Members != null)
+            {
+                GroupMembersList.ItemsSource = _selectedGroup.Members;
+                GroupMembersList.Visibility = GroupMembersList.Visibility == Visibility.Visible
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
+            }
+        }
+
+        private void InviteMemberButton_Click(object sender, RoutedEventArgs e)
+        {
+            
+        }
+
+        private void LeaveGroupButton_Click(object sender, RoutedEventArgs e)
+        {
+            
+        }
+
     }
 }
