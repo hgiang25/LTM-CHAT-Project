@@ -561,7 +561,7 @@ namespace ChatApp.Services
                 throw new Exception($"Failed to get notifications for user {userId}: {ex.Message}", ex);
             }
         }
-        public async Task SendNotificationAsync(string receiverId, string senderId, string content)
+        public async Task SendNotificationAsync(string receiverId, string senderId, string content, string groupId = null)
         {
             var notification = new NotificationData
             {
@@ -570,16 +570,28 @@ namespace ChatApp.Services
                 To = receiverId,
                 Content = content,
                 Timestamp = DateTime.UtcNow.ToString("o"),
-                IsRead = false
+                IsRead = false,
+                GroupId = groupId,
+                IsGroup = groupId != null
             };
 
             DocumentReference docRef = _firestoreDb
                 .Collection("notifications")
                 .Document(receiverId)
                 .Collection("items")
-                .Document(); // tạo document ID tự động
+                .Document();
 
             await docRef.SetAsync(notification);
+        }
+
+        public async Task<string> GetGroupNameAsync(string groupId)
+        {
+            var doc = await _firestoreDb.Collection("groups").Document(groupId).GetSnapshotAsync();
+            if (doc.Exists && doc.ContainsField("name"))
+            {
+                return doc.GetValue<string>("name");
+            }
+            return "Nhóm không xác định";
         }
 
         public async Task MarkNotificationsAsReadAsync(string currUserId, string notificationId)
@@ -609,14 +621,6 @@ namespace ChatApp.Services
                     .Collection("notifications")
                     .Document(userId)
                     .Collection("items");
-
-                //// Lấy tất cả thông báo
-                //QuerySnapshot snapshot = await notifRef.GetSnapshotAsync();
-
-                //// Lọc các thông báo chưa đọc tại client
-                //int unreadCount = snapshot.Documents
-                //    .Select(doc => doc.ConvertTo<NotificationData>())
-                //    .Count(n => n.IsRead == false);
                 var query = notifRef.WhereEqualTo("IsRead", false);
                 var snapshot = await query.GetSnapshotAsync();
                 int unreadCount = snapshot.Count;
@@ -816,6 +820,43 @@ namespace ChatApp.Services
 
             return groupId;
         }
+
+
+        //public async Task<List<string>> GetGroupMembersAsync(string groupId)
+        //{
+        //    try
+        //    {
+        //        DocumentReference groupDocRef = _firestoreDb.Collection("groups").Document(groupId);
+        //        DocumentSnapshot snapshot = await groupDocRef.GetSnapshotAsync();
+
+        //        if (snapshot.Exists && snapshot.ContainsField("members"))
+        //        {
+        //            List<string> members = snapshot.GetValue<List<string>>("members");
+        //            return members ?? new List<string>();
+        //        }
+
+        //        return new List<string>();
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Console.WriteLine($"Error getting group members: {ex.Message}");
+        //        return new List<string>();
+        //    }
+        //}
+
+        public async Task<List<string>> GetGroupMembersAsync(string groupId)
+        {
+            var doc = await _firestoreDb.Collection("groups").Document(groupId).GetSnapshotAsync();
+
+            if (doc.Exists && doc.ContainsField("members"))
+            {
+                var membersMap = doc.GetValue<Dictionary<string, object>>("members");
+                return membersMap.Keys.ToList(); // Chỉ lấy ID của member
+            }
+
+            return new List<string>();
+        }
+
 
 
         public async Task<List<GroupData>> GetGroupsForUserAsync(string userId)

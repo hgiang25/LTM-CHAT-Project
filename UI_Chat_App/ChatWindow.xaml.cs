@@ -71,18 +71,18 @@ namespace UI_Chat_App
             Closing += Window_Closing;
             _chatrooms = new ObservableCollection<object> { };
             // Timer cho bạn bè và lời mời
-            _refreshTimer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromSeconds(15) // Cập nhật bạn bè/lời mời mỗi 60 giây
-            };
-            _refreshTimer.Tick += RefreshFriendsAndRequests_Tick;
+            //_refreshTimer = new DispatcherTimer
+            //{
+            //    Interval = TimeSpan.FromSeconds(15) // Cập nhật bạn bè/lời mời mỗi 60 giây
+            //};
+            //_refreshTimer.Tick += RefreshFriendsAndRequests_Tick;
         }
 
         // Thay thế ChatWindow_Loaded
         private async void ChatWindow_Loaded(object sender, RoutedEventArgs e)
         {
             await InitializeChatAsync();
-            _refreshTimer.Start();                     
+            //_refreshTimer.Start();                     
             await StartListeningForMessages(_currentChatRoomId);
         }
 
@@ -146,16 +146,21 @@ namespace UI_Chat_App
                 {
                     Application.Current.Dispatcher.Invoke(async () =>
                     {
-                        // Cập nhật danh sách UI hoặc thông báo
                         _notifications.Add(notif);
 
-                        // Nếu là tin từ người đang chat, thì đánh dấu là đã đọc luôn
+                        // 🔁 Nếu là người đang chat, đánh dấu là đã đọc
                         if (_selectedUser != null && notif.From == _selectedUser.Id && !notif.IsRead)
                         {
                             await _databaseService.MarkNotificationsAsReadAsync(App.CurrentUser.Id, notif.Id);
                         }
 
-                        // Cập nhật lại số lượng chưa đọc
+                        // ✅ Nếu đang chat với nhóm và thông báo đến từ nhóm đó
+                        else if (_selectedGroup != null && notif.IsGroup && notif.GroupId == _selectedGroup.GroupId && !notif.IsRead)
+                        {
+                            await _databaseService.MarkNotificationsAsReadAsync(App.CurrentUser.Id, notif.Id);
+                        }
+
+                        // Cập nhật số lượng chưa đọc
                         int unreadCount = await _databaseService.CountUnreadNotificationsAsync(App.CurrentUser.Id);
                         NotificationCountText.Text = unreadCount.ToString();
                         NotificationCountText.Visibility = unreadCount > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -164,7 +169,7 @@ namespace UI_Chat_App
 
 
                 // Tải dữ liệu ban đầu
-                //await RefreshFriendsAndRequestsAsync();                
+                await RefreshFriendsAndRequestsAsync();                
                 await LoadAllUsersAsync();
             }
             catch (Exception ex)
@@ -438,6 +443,7 @@ namespace UI_Chat_App
             // Đảm bảo danh sách đã được làm mới
             SentFriendRequestsListBox.ItemsSource = _sentFriendRequests;
         }
+
         private async Task RefreshNotificationAsync()
         {
             Console.WriteLine($"[DEBUG] Start refresh notification is running");
@@ -447,31 +453,47 @@ namespace UI_Chat_App
                 var notifications = await _databaseService.GetNotificationsAsync(App.CurrentUser.Id);
                 if (notifications != null)
                 {
-                    // Kiểm tra và xử lý từng thông báo
                     foreach (var notification in notifications)
                     {
-                        // Đánh dấu thông báo là đã đọc nếu là từ người đang chat
-                        if (_selectedUser != null && !notification.IsRead && notification.From == _selectedUser.Id)
+                        if (!notification.IsRead)
                         {
-                            try
+                            bool shouldMarkRead = false;
+
+                            // Nếu đang chat 1-1, đánh dấu các thông báo từ người đó là đã đọc
+                            if (_selectedUser != null && !notification.IsGroup && notification.From == _selectedUser.Id)
                             {
-                                await _databaseService.MarkNotificationsAsReadAsync(App.CurrentUser.Id, notification.Id);
-                                Console.WriteLine($"Marked notification as read: {notification.Timestamp}");
-                                _notifications.Add(notification);
+                                shouldMarkRead = true;
                             }
-                            catch (Exception ex)
+
+                            // Nếu đang chat nhóm, đánh dấu các thông báo trong nhóm đó là đã đọc
+                            if (_selectedGroup != null && notification.IsGroup && notification.GroupId == _selectedGroup.GroupId)
                             {
-                                Console.WriteLine($"Failed to mark notification as read: {ex.Message}");
+                                shouldMarkRead = true;
+                            }
+
+                            if (shouldMarkRead)
+                            {
+                                try
+                                {
+                                    await _databaseService.MarkNotificationsAsReadAsync(App.CurrentUser.Id, notification.Id);
+                                    Console.WriteLine($"Marked notification as read: {notification.Timestamp}");
+                                    _notifications.Add(notification);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"Failed to mark notification as read: {ex.Message}");
+                                }
                             }
                         }
                     }
 
-                    // ✅ Cập nhật số lượng thông báo chưa đọc trên giao diện (không phụ thuộc vào _selectedUser)
+                    // Cập nhật badge số lượng thông báo chưa đọc
                     try
                     {
                         Console.WriteLine("Calling CountUnreadNotificationsAsync...");
                         int unreadCount = await _databaseService.CountUnreadNotificationsAsync(App.CurrentUser.Id);
                         Console.WriteLine($"Returned unread count = {unreadCount}");
+
                         Application.Current.Dispatcher.Invoke(() =>
                         {
                             NotificationCountText.Text = unreadCount.ToString();
@@ -489,6 +511,7 @@ namespace UI_Chat_App
                 Console.WriteLine($"Failed to refresh notifications: {ex.Message}");
             }
         }
+
 
         private async Task StartListeningForMessages(string chatRoomId)
         {
@@ -835,28 +858,28 @@ namespace UI_Chat_App
         }
 
 
-        private UIElement CreateMessageBubble(UIElement content, bool isMine)
-        {
-            var stack = new StackPanel();
-            stack.Children.Add(content);
+        //private UIElement CreateMessageBubble(UIElement content, bool isMine)
+        //{
+        //    var stack = new StackPanel();
+        //    stack.Children.Add(content);
 
-            return new Border
-            {
-                Background = isMine ? Brushes.LightGreen : Brushes.White,
-                CornerRadius = new CornerRadius(10),
-                Padding = new Thickness(10),
-                Margin = new Thickness(5),
-                MaxWidth = 300,
-                Child = stack,
-                HorizontalAlignment = isMine ? HorizontalAlignment.Right : HorizontalAlignment.Left,
-                Effect = new System.Windows.Media.Effects.DropShadowEffect
-                {
-                    BlurRadius = 5,
-                    Opacity = 0.2,
-                    ShadowDepth = 2
-                }
-            };
-        }
+        //    return new Border
+        //    {
+        //        Background = isMine ? Brushes.LightGreen : Brushes.White,
+        //        CornerRadius = new CornerRadius(10),
+        //        Padding = new Thickness(10),
+        //        Margin = new Thickness(5),
+        //        MaxWidth = 300,
+        //        Child = stack,
+        //        HorizontalAlignment = isMine ? HorizontalAlignment.Right : HorizontalAlignment.Left,
+        //        Effect = new System.Windows.Media.Effects.DropShadowEffect
+        //        {
+        //            BlurRadius = 5,
+        //            Opacity = 0.2,
+        //            ShadowDepth = 2
+        //        }
+        //    };
+        //}
 
 
         private async Task LoadAllUsersAsync()
@@ -893,7 +916,7 @@ namespace UI_Chat_App
             {
                 Console.WriteLine($"Failed to load all users: {ex.Message}");
             }
-        }        
+        }
 
         private async void UserListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -905,7 +928,7 @@ namespace UI_Chat_App
                 if ((newSelectedUser != _selectedUser && newSelectedUser != null) || _currentChatRoomId == null)
                 {
                     _selectedUser = newSelectedUser;
-                    _selectedGroup = null; // Hủy group nếu có
+                    _selectedGroup = null;
 
                     bool areFriends = await _databaseService.AreFriendsAsync(App.CurrentUser.Id, _selectedUser.Id);
                     if (!areFriends)
@@ -913,7 +936,13 @@ namespace UI_Chat_App
                         MessageBox.Show("You can only chat with friends. Please add this user as a friend first.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
                         ResetChatUI();
                         return;
-                    }                    
+                    }
+
+                    // 👉 Hiện User profile, ẩn Group profile
+                    GroupProfilePanel.Visibility = Visibility.Collapsed;
+                    UserProfilePanel.Visibility = Visibility.Visible;
+                    UserProfileColumn.Width = new GridLength(230); // hoặc Auto tùy thiết kế
+
                     ChatWithTextBlock.Text = $"Chat with {_selectedUser.DisplayName}";
                     ProfileUsername.Text = $"Username: {_selectedUser.DisplayName}";
                     ProfileEmail.Text = $"Email: {_selectedUser.Email}";
@@ -937,57 +966,64 @@ namespace UI_Chat_App
                 // --- Xử lý chat nhóm ---
                 _selectedGroup = selectedGroup;
                 _selectedUser = null;
-                _selectedUser = null; // Hủy user nếu có
-                var NameGroup = GetUserNameById(_selectedGroup.CreatedBy);
 
-                ChatWithTextBlock.Text = $"Group: {_selectedGroup.Name}";
+               // string nameGroup = await GetUserNameById(_selectedGroup.CreatedBy);
 
-                // Ẩn UserProfilePanel, hiện GroupProfilePanel
+                // 👉 Hiện Group profile, ẩn User profile
                 UserProfilePanel.Visibility = Visibility.Collapsed;
                 GroupProfilePanel.Visibility = Visibility.Visible;
-                UserProfileColumn.Width = new GridLength(230); // nếu đang dùng Grid có 3 cột
+                UserProfileColumn.Width = new GridLength(230);
 
-                // Cập nhật Group Profile UI
+                ChatWithTextBlock.Text = $"Group: {_selectedGroup.Name}";
                 GroupProfileName.Text = _selectedGroup.Name;
-                GroupCreatedBy.Text = $"Created by: {_selectedGroup.CreatedBy}";
-                GroupMemberCount.Text = $"Members: {_selectedGroup.MemberCount}";
+                GroupCreatedBy.Text = $"Created by: {_selectedGroup.Name}";
+                GroupMemberCount.Text = $"Members: {_selectedGroup.MemberCount} members";
                 GroupProfileAvatar.Source = LoadAvatar(_selectedGroup.Avatar);
-                ProfileUsername.Text = $"Group Name: {_selectedGroup.Name}";
-                ProfileEmail.Text = $"Created by: {NameGroup}";
-                ProfileStatus.Text = $"Members: {_selectedGroup.MemberCount}";
-                ProfileAvatar.Source = LoadAvatar(_selectedGroup.Avatar);
 
-                // Xử lý chat nhóm
+                //// Cập nhật đồng thời Profile bên phải (nếu bạn dùng chung cho User/Group)
+                //ProfileUsername.Text = $"Group Name: {_selectedGroup.Name}";
+                //ProfileEmail.Text = $"Created by: {nameGroup}";
+                //ProfileStatus.Text = $"Members: {_selectedGroup.MemberCount}";
+                //ProfileAvatar.Source = LoadAvatar(_selectedGroup.Avatar);
+
                 _currentChatRoomId = _selectedGroup.GroupId;
                 _lastMessageTimestamp = null;
                 _messages.Clear();
                 MessagesStackPanel.Children.Clear();
 
+                await RefreshNotificationAsync();
                 await _databaseService.StopListeningToMessagesAsync();
                 await LoadInitialMessagesAsync(_currentChatRoomId);
                 await StartListeningForMessages(_currentChatRoomId);
             }
-
             else
             {
                 ResetChatUI();
             }
         }
 
+
         private void ResetChatUI()
         {
             _selectedUser = null;
             _selectedGroup = null;
             UserListBox.SelectedItem = null;
+            _currentChatRoomId = null;
+            _lastMessageTimestamp = null;
+
             MessagesStackPanel.Children.Clear();
             ChatWithTextBlock.Text = "Chat with [User/Group]";
+
             ProfileAvatar.Source = null;
             ProfileUsername.Text = "Username: [Username]";
             ProfileEmail.Text = "Email: user@example.com";
             ProfileStatus.Text = "Status: Offline";
-            _currentChatRoomId = null;
-            _lastMessageTimestamp = null;
+
+            // Ẩn cả hai profile panel
+            UserProfilePanel.Visibility = Visibility.Collapsed;
+            GroupProfilePanel.Visibility = Visibility.Collapsed;
         }
+
 
         private BitmapImage LoadAvatar(string avatarUrl)
         {
@@ -1102,6 +1138,22 @@ namespace UI_Chat_App
                 await _databaseService.SendNotificationAsync(_selectedUser.Id, App.CurrentUser.Id, messageContent);
                 await RefreshNotificationAsync();
             }
+            if (_selectedGroup != null)
+            {
+                var groupMembers = await _databaseService.GetGroupMembersAsync(_selectedGroup.GroupId);
+                foreach (var memberId in groupMembers)
+                {
+                    Console.WriteLine($"Gửi thông báo tới thành viên nhóm: {memberId}");
+
+                    if (memberId != App.CurrentUser.Id)
+                    {
+                        await _databaseService.SendNotificationAsync(memberId, App.CurrentUser.Id, messageContent, _selectedGroup.GroupId);
+                    }
+                }
+
+                await RefreshNotificationAsync();
+            }
+
         }
 
 
@@ -1109,7 +1161,7 @@ namespace UI_Chat_App
         {
             try
             {
-                _refreshTimer.Stop();
+                //_refreshTimer.Stop();
                 //_messageRefreshTimer.Stop();
                 Console.WriteLine("Timers stopped on window closing.");
 
@@ -1327,32 +1379,46 @@ namespace UI_Chat_App
 
         private async void NotificationButton_Click(object sender, RoutedEventArgs e)
         {
-            // Code xử lý khi nhấn nút thông báo
-            //NotificationPopup.IsOpen = !NotificationPopup.IsOpen;
             NotificationPopup.PlacementTarget = NotificationButton;
-
             NotificationPopup.IsOpen = true;
             NotificationListPanel.Children.Clear();
 
-            // Lấy danh sách tất cả thông báo
             var notifications = await _databaseService.GetNotificationsAsync(App.CurrentUser.Id);
 
-            // Gom nhóm theo người gửi và đếm số lượng chưa đọc
             var grouped = notifications
                 .Where(n => !n.IsRead)
-                .GroupBy(n => n.From)
-                .Select(g => new NotificationSummary
+                .GroupBy(n => n.IsGroup ? n.GroupId : n.From)
+                .Select(g =>
                 {
-                    SenderId = g.Key,
-                    SenderName = GetUserNameById(g.Key), // Nếu bạn có thông tin tên
-                    UnreadCount = g.Count()
+                    // Lấy thông tin group hoặc user theo key
+                    var key = g.Key;
+                    var isGroup = notifications.FirstOrDefault(n => (n.IsGroup ? n.GroupId : n.From) == key)?.IsGroup ?? false;
+
+                    string displayName = key;
+                    if (isGroup)
+                    {
+                        var group = _groups.FirstOrDefault(gr => gr.GroupId == key);
+                        displayName = group?.Name ?? key;
+                    }
+                    else
+                    {
+                        var user = _users.FirstOrDefault(u => u.Id == key);
+                        displayName = user?.DisplayName ?? key;
+                    }
+
+                    return new NotificationSummary
+                    {
+                        SenderId = key,
+                        SenderName = displayName,
+                        UnreadCount = g.Count()
+                    };
                 });
 
             foreach (var item in grouped)
             {
                 var button = new Button
                 {
-                    Content = $"{item.SenderName ?? item.SenderId}: {item.UnreadCount} tin nhắn",
+                    Content = $"{item.SenderName}: {item.UnreadCount} tin nhắn",
                     Margin = new Thickness(0, 5, 0, 5),
                     Tag = item.SenderId,
                     HorizontalAlignment = HorizontalAlignment.Stretch
@@ -1362,8 +1428,8 @@ namespace UI_Chat_App
 
                 NotificationListPanel.Children.Add(button);
             }
-
         }
+
 
         private string GetUserNameById(string id)
         {
@@ -1375,26 +1441,40 @@ namespace UI_Chat_App
         {
             if (sender is Button button && button.Tag is string senderId)
             {
-                // Tìm user trong danh sách bạn
-                var targetUser = _users.FirstOrDefault(u => u.Id == senderId);
-                if (targetUser != null)
+                // Tìm nhóm trước (để ưu tiên)
+                var targetGroup = _groups.FirstOrDefault(g => g.GroupId == senderId);
+                if (targetGroup != null)
                 {
-                    UserListBox.SelectedItem = targetUser;
-
-                    // Đánh dấu các tin nhắn từ người đó là đã đọc
-                    var notifications = await _databaseService.GetNotificationsAsync(App.CurrentUser.Id);
-                    foreach (var notif in notifications.Where(n => n.From == senderId && !n.IsRead))
+                    UserListBox.SelectedItem = targetGroup;
+                }
+                else
+                {
+                    // Nếu không phải group thì tìm user
+                    var targetUser = _users.FirstOrDefault(u => u.Id == senderId);
+                    if (targetUser != null)
                     {
-                        await _databaseService.MarkNotificationsAsReadAsync(App.CurrentUser.Id, notif.Id);
+                        UserListBox.SelectedItem = targetUser;
                     }
-
-                    // Làm mới lại số lượng chưa đọc
-                    await RefreshNotificationAsync();
                 }
 
+                // Đánh dấu tất cả thông báo thuộc senderId (groupId hoặc userId) là đã đọc
+                var notifications = await _databaseService.GetNotificationsAsync(App.CurrentUser.Id);
+
+                var unreadNotifications = notifications.Where(n =>
+                    !n.IsRead && ((n.IsGroup && n.GroupId == senderId) || (!n.IsGroup && n.From == senderId))
+                );
+
+                foreach (var notif in unreadNotifications)
+                {
+                    await _databaseService.MarkNotificationsAsReadAsync(App.CurrentUser.Id, notif.Id);
+                }
+
+                await RefreshNotificationAsync();
                 NotificationPopup.IsOpen = false;
             }
         }
+
+
 
 
 
