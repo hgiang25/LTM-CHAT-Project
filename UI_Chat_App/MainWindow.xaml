@@ -80,14 +80,16 @@
                                              Visibility="Visible"/>
 
                                 <TextBox x:Name="VisiblePasswordBox"
-         Visibility="Collapsed"
-         IsReadOnly="False"
-         Focusable="True"
-         AcceptsReturn="False"
-         VerticalContentAlignment="Center"
-         FontSize="16"
-         Margin="0"
-         Padding="5"/>
+                                 Visibility="Collapsed"
+                                 IsReadOnly="False"
+                                 Focusable="True"
+                                 AcceptsReturn="False"
+                                 VerticalContentAlignment="Center"
+                                 FontSize="16"
+                                 Margin="0"
+                                 Padding="5"
+                                 TextChanged="VisiblePasswordBox_TextChanged"/>
+
 
                             </Grid>
 

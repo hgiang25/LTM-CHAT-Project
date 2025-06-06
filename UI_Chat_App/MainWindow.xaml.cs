@@ -116,17 +116,17 @@ namespace UI_Chat_App
             }
         }
 
-        private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
-        {
-            PasswordBox passwordBox = sender as PasswordBox;
-            if (passwordBox != null)
-            {
-                if (passwordBox.Name == "PasswordBox" && passwordBox.Password != "")
-                {
-                    PasswordPlaceholder.Visibility = Visibility.Collapsed;
-                }
-            }
-        }
+        //private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
+        //{
+        //    PasswordBox passwordBox = sender as PasswordBox;
+        //    if (passwordBox != null)
+        //    {
+        //        if (passwordBox.Name == "PasswordBox" && passwordBox.Password != "")
+        //        {
+        //            PasswordPlaceholder.Visibility = Visibility.Collapsed;
+        //        }
+        //    }
+        //}
 
         private void SignUpTextBlock_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
@@ -259,6 +259,29 @@ namespace UI_Chat_App
                 PasswordToggleIcon.Source = new BitmapImage(new Uri("Icons/hide.png", UriKind.Relative));
             }
         }
+
+        private void VisiblePasswordBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (isPasswordVisible)
+            {
+                PasswordBox.Password = VisiblePasswordBox.Text;
+            }
+        }
+
+        private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            if (!isPasswordVisible)
+            {
+                PasswordPlaceholder.Visibility = string.IsNullOrEmpty(PasswordBox.Password) ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            // Đồng bộ nếu đang ẩn chế độ xem
+            if (!isPasswordVisible)
+            {
+                VisiblePasswordBox.Text = PasswordBox.Password;
+            }
+        }
+
 
     }
 }

@@ -704,40 +704,7 @@ namespace ChatApp.Services
             });
         }
 
-        private FirestoreChangeListener _messageListener;
-
-        //public async Task StartListeningToMessagesAsync(string chatRoomId, Timestamp? lastTimestamp, Action<MessageData> onMessageReceived)
-        //{
-        //    if (_messageListener != null)
-        //    {
-        //        await _messageListener.StopAsync();
-        //        _messageListener = null;
-        //    }
-
-        //    var messagesRef = _firestoreDb
-        //        .Collection("messages")
-        //        .Document(chatRoomId)
-        //        .Collection("messages");
-
-        //    Query query = messagesRef.OrderBy("Timestamp");
-
-        //    if (lastTimestamp != null)
-        //    {
-        //        query = query.WhereGreaterThan("Timestamp", lastTimestamp);
-        //    }
-
-        //    _messageListener = query.Listen(snapshot =>
-        //    {
-        //        foreach (var docChange in snapshot.Changes)
-        //        {
-        //            if (docChange.ChangeType == Google.Cloud.Firestore.DocumentChange.Type.Added)
-        //            {
-        //                var message = docChange.Document.ConvertTo<MessageData>();
-        //                onMessageReceived?.Invoke(message);
-        //            }
-        //        }
-        //    });
-        //}
+        private FirestoreChangeListener _messageListener;       
 
         public async Task StartListeningToMessagesAsync(string chatRoomId, Action<MessageData> onMessageReceived)
         {
@@ -885,28 +852,7 @@ namespace ChatApp.Services
             {
                 throw new Exception($"Failed to get groups for user: {ex.Message}", ex);
             }
-        }
-
-
-
-
-        public async Task SendGroupMessageAsync(string groupId, string senderId, string content)
-        {
-            var messageData = new Dictionary<string, object>
-            {
-                { "senderId", senderId },
-                { "content", content },
-                { "timestamp", Timestamp.GetCurrentTimestamp() }
-            };
-
-            var messagesRef = _firestoreDb
-                .Collection("groups")
-                .Document(groupId)
-                .Collection("messages");
-
-            await messagesRef.AddAsync(messageData);
-        }
-
+        }       
 
 
         //    public async Task ApproveMemberAsync(string groupId, string userId)
