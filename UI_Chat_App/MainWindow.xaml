@@ -7,7 +7,7 @@
         mc:Ignorable="d"
         WindowStartupLocation="CenterScreen"
         Title="Login" Height="540" Width="800"
-        Background="Transparent" WindowStyle="None" AllowsTransparency="True">
+        Background="Transparent" WindowStyle="None" ResizeMode="CanResize">
 
     <Window.Resources>
         <ResourceDictionary>
@@ -80,14 +80,14 @@
                                              Visibility="Visible"/>
 
                                 <TextBox x:Name="VisiblePasswordBox"
-         Visibility="Collapsed"
-         IsReadOnly="False"
-         Focusable="True"
-         AcceptsReturn="False"
-         VerticalContentAlignment="Center"
-         FontSize="16"
-         Margin="0"
-         Padding="5"/>
+                                         Visibility="Collapsed"
+                                         IsReadOnly="False"
+                                         Focusable="True"
+                                         AcceptsReturn="False"
+                                         VerticalContentAlignment="Center"
+                                         FontSize="16"
+                                         Margin="0"
+                                         Padding="5"/>  
 
                             </Grid>
 
