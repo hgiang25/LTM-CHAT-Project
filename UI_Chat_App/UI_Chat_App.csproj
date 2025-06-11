@@ -347,13 +347,16 @@
     <Compile Include="Converters\MixedItemTemplateSelector .cs" />
     <Compile Include="Converters\HasPendingRequestConverter.cs" />
     <Compile Include="Converters\ImageUrlConverter.cs" />
+    <Compile Include="Converters\VisualTreeHelperExtensions.cs" />
     <Compile Include="Helpers\ConfigHelper.cs" />
     <Compile Include="Models\FriendData.cs" />
     <Compile Include="Models\FriendRequest.cs" />
     <Compile Include="Models\FriendRequestWithUserInfo.cs" />
     <Compile Include="Models\GroupData.cs" />
+    <Compile Include="Models\InviteFriendModel.cs" />
     <Compile Include="Models\MessageData.cs" />
     <Compile Include="Models\NotificationData.cs" />
+    <Compile Include="Models\PendingMemberModel.cs" />
     <Compile Include="Models\UserData.cs" />
     <Compile Include="Services\FirebaseAuthService.cs" />
     <Compile Include="Services\FirebaseDatabaseService.cs" />

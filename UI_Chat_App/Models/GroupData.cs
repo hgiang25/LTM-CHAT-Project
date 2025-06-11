@@ -30,5 +30,9 @@ namespace ChatApp.Models
 
         [FirestoreProperty]
         public Dictionary<string, string> Members { get; set; } = new Dictionary<string, string>();        // userId => role
+
+        [FirestoreProperty]
+        public Dictionary<string, string> PendingMembers { get; set; } = new Dictionary<string, string>(); // userId => status (e.g. "invited")
+
     }
 }

@@ -822,41 +822,43 @@ namespace ChatApp.Services
         }
 
 
-        //public async Task<List<string>> GetGroupMembersAsync(string groupId)
-        //{
-        //    try
-        //    {
-        //        DocumentReference groupDocRef = _firestoreDb.Collection("groups").Document(groupId);
-        //        DocumentSnapshot snapshot = await groupDocRef.GetSnapshotAsync();
-
-        //        if (snapshot.Exists && snapshot.ContainsField("members"))
-        //        {
-        //            List<string> members = snapshot.GetValue<List<string>>("members");
-        //            return members ?? new List<string>();
-        //        }
-
-        //        return new List<string>();
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Console.WriteLine($"Error getting group members: {ex.Message}");
-        //        return new List<string>();
-        //    }
-        //}
-
         public async Task<List<string>> GetGroupMembersAsync(string groupId)
         {
             var doc = await _firestoreDb.Collection("groups").Document(groupId).GetSnapshotAsync();
 
-            if (doc.Exists && doc.ContainsField("members"))
+            var result = new HashSet<string>(); // Dùng HashSet để loại trùng nếu có
+
+            if (doc.Exists)
             {
-                var membersMap = doc.GetValue<Dictionary<string, object>>("members");
-                return membersMap.Keys.ToList(); // Chỉ lấy ID của member
+                if (doc.ContainsField("members"))
+                {
+                    var membersMap = doc.GetValue<Dictionary<string, object>>("members");
+                    foreach (var key in membersMap.Keys)
+                        result.Add(key);
+                }
+
+                if (doc.ContainsField("pending members"))
+                {
+                    var pendingMap = doc.GetValue<Dictionary<string, object>>("pending members");
+                    foreach (var key in pendingMap.Keys)
+                        result.Add(key);
+                }
             }
 
-            return new List<string>();
+            return result.ToList();
         }
 
+
+        public async Task<List<string>> GetGroupPendingMembersAsync(string groupId)
+        {
+            var doc = await _firestoreDb.Collection("groups").Document(groupId).GetSnapshotAsync();
+            if (doc.Exists && doc.ContainsField("pending members"))
+            {
+                var pendingMap = doc.GetValue<Dictionary<string, object>>("pending members");
+                return pendingMap.Keys.ToList();
+            }
+            return new List<string>();
+        }
 
 
         public async Task<List<GroupData>> GetGroupsForUserAsync(string userId)
@@ -893,28 +895,194 @@ namespace ChatApp.Services
             {
                 throw new Exception($"Failed to get groups for user: {ex.Message}", ex);
             }
-        }       
+        }
+
+        public async Task InviteMemberToGroupAsync(string groupId, string inviterId, string targetUserId)
+        {
+            var groupRef = _firestoreDb.Collection("groups").Document(groupId);
+            var groupSnap = await groupRef.GetSnapshotAsync();
+
+            if (!groupSnap.Exists)
+                throw new Exception("Group does not exist.");
+
+            // Load members và pendingMembers
+            var members = groupSnap.ContainsField("members")
+                ? groupSnap.GetValue<Dictionary<string, object>>("members").ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString())
+                : new Dictionary<string, string>();
+
+            var pendingMembers = groupSnap.ContainsField("pending members")
+                ? groupSnap.GetValue<Dictionary<string, object>>("pending members").ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString())
+                : new Dictionary<string, string>();
+
+            // Nếu đã là thành viên => không làm gì
+            if (members.ContainsKey(targetUserId))
+                throw new Exception("User is already a member.");
+
+            // Kiểm tra người mời có phải admin không
+            bool isInviterAdmin = members.TryGetValue(inviterId, out var role) && role == "admin";
+
+            if (isInviterAdmin)
+            {
+                // Nếu có trong pending thì xoá
+                if (pendingMembers.ContainsKey(targetUserId))
+                {
+                    pendingMembers.Remove(targetUserId);
+                }
+
+                // Thêm vào members
+                members[targetUserId] = "member";
+
+                // Cập nhật cả members và pendingMembers
+                var updates = new Dictionary<string, object>
+        {
+            { "members", members },
+            { "pending members", pendingMembers },
+            { "memberCount", members.Count }
+        };
+
+                await groupRef.UpdateAsync(updates);
+            }
+            else
+            {
+                // Nếu người thường mời => check đã được mời chưa
+                if (pendingMembers.ContainsKey(targetUserId))
+                    throw new Exception("User has already been invited.");
+
+                pendingMembers[targetUserId] = "invited";
+
+                await groupRef.UpdateAsync("pending members", pendingMembers);
+            }
+        }
 
 
-        //    public async Task ApproveMemberAsync(string groupId, string userId)
-        //    {
-        //        var memberRef = _firestoreDb.Collection("groups").Document(groupId);
-        //        var updates = new Dictionary<string, object>
-        //{
-        //    { $"members.{userId}", "member" }
-        //};
-        //        await memberRef.UpdateAsync(updates);
-        //    }
+        public async Task<List<UserData>> GetUsersByIdsAsync(List<string> userIds)
+        {
+            var users = new List<UserData>();
+            var usersCollection = _firestoreDb.Collection("users");
 
-        //    public async Task RemoveMemberAsync(string groupId, string userId)
-        //    {
-        //        var groupRef = _firestoreDb.Collection("groups").Document(groupId);
-        //        var updates = new Dictionary<FieldPath, object>
-        //{
-        //    { new FieldPath("members", userId), FieldValue.Delete }
-        //};
-        //        await groupRef.UpdateAsync(updates);
-        //    }
+            foreach (var userId in userIds)
+            {
+                var snapshot = await usersCollection.Document(userId).GetSnapshotAsync();
+                if (snapshot.Exists)
+                {
+                    users.Add(snapshot.ConvertTo<UserData>());
+                }
+                else
+                {
+                    Console.WriteLine($"User not found: {userId}");
+                }
+            }
+
+            return users;
+        }
+
+        public async Task RejectMemberAsync(string groupId, string userId)
+        {
+            var groupRef = _firestoreDb.Collection("groups").Document(groupId);
+
+            // Xóa trực tiếp userId khỏi trường pendingMembers mà không cần tải toàn bộ
+            var updates = new Dictionary<string, object>
+    {
+        { $"pending members.{userId}", FieldValue.Delete }
+    };
+
+            await groupRef.UpdateAsync(updates);
+
+            Console.WriteLine($"User {userId} has been rejected from group {groupId}.");
+        }
+
+
+        public async Task ApproveMemberAsync(string groupId, string userId)
+        {
+            var groupRef = _firestoreDb.Collection("groups").Document(groupId);
+            var snapshot = await groupRef.GetSnapshotAsync();
+
+            var members = snapshot.GetValue<Dictionary<string, object>>("members")
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString());
+
+            var pendingMembers = snapshot.ContainsField("pending members")
+                ? snapshot.GetValue<Dictionary<string, object>>("pending members").ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString())
+                : new Dictionary<string, string>();
+
+            if (!pendingMembers.ContainsKey(userId))
+                throw new Exception("User is not in pending list.");
+
+            // Thêm vào members, xoá khỏi pending
+            members[userId] = "member";
+            pendingMembers.Remove(userId);
+
+            await groupRef.UpdateAsync(new Dictionary<string, object>
+            {
+                { "members", members },
+                { "pending members", pendingMembers },
+                { "memberCount", members.Count }
+            });
+        }
+
+        public async Task<GroupData> GetGroupAsync(string groupId)
+        {
+            var docRef = _firestoreDb.Collection("groups").Document(groupId);
+            var snapshot = await docRef.GetSnapshotAsync();
+
+            if (!snapshot.Exists)
+                throw new Exception("Group not found.");
+
+            var groupData = snapshot.ConvertTo<GroupData>();
+            groupData.GroupId = snapshot.Id;
+
+            // Handle members field
+            if (snapshot.ContainsField("members"))
+            {
+                var membersMap = snapshot.GetValue<Dictionary<string, object>>("members");
+                groupData.Members = membersMap.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString());
+                Console.WriteLine($"Loaded members: {string.Join(", ", groupData.Members.Select(kvp => $"{kvp.Key}: {kvp.Value}"))}");
+            }
+            else
+            {
+                groupData.Members = new Dictionary<string, string>();
+                Console.WriteLine("No members found in group document.");
+            }
+
+            // Handle pendingMembers field
+            if (snapshot.ContainsField("pending members"))
+            {
+                var pendingMembersMap = snapshot.GetValue<Dictionary<string, object>>("pending members");
+                groupData.PendingMembers = pendingMembersMap.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString());
+                Console.WriteLine($"Loaded pending members: {string.Join(", ", groupData.PendingMembers.Select(kvp => $"{kvp.Key}: {kvp.Value}"))}");
+            }
+            else
+            {
+                groupData.PendingMembers = new Dictionary<string, string>();
+                Console.WriteLine("No pending members found in group document.");
+            }
+
+            return groupData;
+        }
+
+
+        public async Task<List<UserData>> LoadUsersByIdsAsync(List<string> userIds)
+        {
+            var users = new List<UserData>();
+            var usersCollection = _firestoreDb.Collection("users");
+
+            // Dùng Task để thực hiện truy vấn song song
+            var tasks = userIds.Select(async userId =>
+            {
+                var snapshot = await usersCollection.Document(userId).GetSnapshotAsync();
+                return snapshot.Exists ? snapshot.ConvertTo<UserData>() : null;
+            });
+
+            var results = await Task.WhenAll(tasks);
+
+            foreach (var user in results)
+            {
+                if (user != null)
+                    users.Add(user);
+            }
+
+            return users;
+        }
+
 
 
         //    public async Task<List<GroupData>> SearchGroupsByNameAsync(string keyword)

@@ -23,6 +23,7 @@ using System.Windows.Controls.Primitives;
 using System.Net;
 using System.Windows.Media.Animation;
 using Google.Cloud.Firestore.V1;
+using UI_Chat_App.Models;
 
 namespace UI_Chat_App
 {
@@ -858,28 +859,6 @@ namespace UI_Chat_App
         }
 
 
-        //private UIElement CreateMessageBubble(UIElement content, bool isMine)
-        //{
-        //    var stack = new StackPanel();
-        //    stack.Children.Add(content);
-
-        //    return new Border
-        //    {
-        //        Background = isMine ? Brushes.LightGreen : Brushes.White,
-        //        CornerRadius = new CornerRadius(10),
-        //        Padding = new Thickness(10),
-        //        Margin = new Thickness(5),
-        //        MaxWidth = 300,
-        //        Child = stack,
-        //        HorizontalAlignment = isMine ? HorizontalAlignment.Right : HorizontalAlignment.Left,
-        //        Effect = new System.Windows.Media.Effects.DropShadowEffect
-        //        {
-        //            BlurRadius = 5,
-        //            Opacity = 0.2,
-        //            ShadowDepth = 2
-        //        }
-        //    };
-        //}
 
 
         private async Task LoadAllUsersAsync()
@@ -967,24 +946,33 @@ namespace UI_Chat_App
                 _selectedGroup = selectedGroup;
                 _selectedUser = null;
 
-               // string nameGroup = await GetUserNameById(_selectedGroup.CreatedBy);
+                // Ẩn toàn bộ UI liên quan đến member list khi chuyển nhóm
+                GroupMembersList.ItemsSource = null;
+                GroupMembersList.Visibility = Visibility.Collapsed;
+                PendingMembersListBox.ItemsSource = null;
+                PendingMembersListBox.Visibility = Visibility.Collapsed;
+                PendingMembersLabel.Visibility = Visibility.Collapsed;
+                //PendingMembersButtonsPanel.Visibility = Visibility.Collapsed;
+                ApproveSelectedButton.Visibility = Visibility.Collapsed;
+                RejectSelectedButton.Visibility = Visibility.Collapsed;
+                //InviteMember
+                FriendCheckboxList.ItemsSource= null;
+                FriendCheckboxList.Visibility = Visibility.Collapsed ;
+                ConfirmInviteButton.Visibility = Visibility.Collapsed ;
+                InviteFriendLabel.Visibility = Visibility.Collapsed ;
+
 
                 // 👉 Hiện Group profile, ẩn User profile
                 UserProfilePanel.Visibility = Visibility.Collapsed;
                 GroupProfilePanel.Visibility = Visibility.Visible;
                 UserProfileColumn.Width = new GridLength(230);
 
+                var Admin = await GetUserNameById(_selectedGroup.CreatedBy);
                 ChatWithTextBlock.Text = $"Group: {_selectedGroup.Name}";
                 GroupProfileName.Text = _selectedGroup.Name;
-                GroupCreatedBy.Text = $"Created by: {_selectedGroup.Name}";
+                GroupCreatedBy.Text = $"Created by: {Admin}";
                 GroupMemberCount.Text = $"Members: {_selectedGroup.MemberCount} members";
                 GroupProfileAvatar.Source = LoadAvatar(_selectedGroup.Avatar);
-
-                //// Cập nhật đồng thời Profile bên phải (nếu bạn dùng chung cho User/Group)
-                //ProfileUsername.Text = $"Group Name: {_selectedGroup.Name}";
-                //ProfileEmail.Text = $"Created by: {nameGroup}";
-                //ProfileStatus.Text = $"Members: {_selectedGroup.MemberCount}";
-                //ProfileAvatar.Source = LoadAvatar(_selectedGroup.Avatar);
 
                 _currentChatRoomId = _selectedGroup.GroupId;
                 _lastMessageTimestamp = null;
@@ -996,6 +984,7 @@ namespace UI_Chat_App
                 await LoadInitialMessagesAsync(_currentChatRoomId);
                 await StartListeningForMessages(_currentChatRoomId);
             }
+
             else
             {
                 ResetChatUI();
@@ -1022,7 +1011,19 @@ namespace UI_Chat_App
             // Ẩn cả hai profile panel
             UserProfilePanel.Visibility = Visibility.Collapsed;
             GroupProfilePanel.Visibility = Visibility.Collapsed;
+
+            //// 👉 Reset UI liên quan đến nhóm
+            //GroupMembersList.ItemsSource = null;
+            //GroupMembersList.Visibility = Visibility.Collapsed;
+            //PendingMembersListBox.ItemsSource = null;
+            //PendingMembersPopup.IsOpen = false;
+
+            //// Nếu bạn có thể disable các nút (tùy thiết kế)
+            //ViewMembersButton.IsEnabled = false;
+            //InviteMemberButton.IsEnabled = false;
+            //LeaveGroupButton.IsEnabled = false;
         }
+
 
 
         private BitmapImage LoadAvatar(string avatarUrl)
@@ -1052,13 +1053,16 @@ namespace UI_Chat_App
 
         private async void MessageTextBox_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Enter && !_isSending)
+            if (e.Key == Key.Enter && Keyboard.Modifiers != ModifierKeys.Shift && !_isSending)
             {
+                e.Handled = true;
                 _isSending = true;
                 await SendMessageAsync();
                 _isSending = false;
             }
         }
+
+
 
         //Cập nhật trạng thái "typing" lên Firebase
 
@@ -1284,7 +1288,7 @@ namespace UI_Chat_App
                 // Nếu không có từ khóa tìm kiếm, hiển thị danh sách mặc định
                 if (TabControl.SelectedIndex == 0) // Tab Chat
                 {
-                    UserListBox.ItemsSource = _users;
+                    UserListBox.ItemsSource = _chatrooms;
                 }
                 else if (TabControl.SelectedIndex == 1) // Tab Add Friends
                 {
@@ -1431,12 +1435,32 @@ namespace UI_Chat_App
         }
 
 
-        private string GetUserNameById(string id)
+        private async Task<string> GetUserNameById(string id)
         {
-            // Nếu bạn có sẵn danh sách bạn bè
+            // Ưu tiên lấy từ cache (_users)
             var user = _users.FirstOrDefault(f => f.Id == id);
-            return user?.DisplayName ?? id;
+            if (user != null)
+                return user.DisplayName;
+
+            try
+            {
+                // Nếu không có, truy vấn Firestore
+                var userDoc = await _databaseService.GetDb().Collection("users").Document(id).GetSnapshotAsync();
+                if (userDoc.Exists)
+                {
+                    var displayName = userDoc.GetValue<string>("DisplayName");
+                    return displayName ?? id;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Lỗi khi lấy user {id}: {ex.Message}");
+            }
+
+            // Fallback nếu không tìm được
+            return id;
         }
+
         private async void NotificationItem_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button button && button.Tag is string senderId)
@@ -2034,7 +2058,7 @@ namespace UI_Chat_App
                 // Làm mới danh sách dựa trên tab hiện tại
                 if (TabControl.SelectedIndex == 0) // Tab Chat
                 {
-                    UserListBox.ItemsSource = _users;
+                    UserListBox.ItemsSource = _chatrooms;
                 }
                 else if (TabControl.SelectedIndex == 1) // Tab Add Friends
                 {
@@ -2075,21 +2099,252 @@ namespace UI_Chat_App
             _typingTimer.Start();
         }
 
-        private void ViewMembersButton_Click(object sender, RoutedEventArgs e)
+        private async Task RefreshGroupUIAsync()
         {
-            if (_selectedGroup != null && _selectedGroup.Members != null)
+            // 1. Lấy lại dữ liệu nhóm
+            _selectedGroup = await _databaseService.GetGroupAsync(_selectedGroup.GroupId);
+            //GroupMemberCount.Text = $"Members: {_selectedGroup.MemberCount} members";
+
+            // 2. Cập nhật danh sách thành viên
+            var memberIds = _selectedGroup.Members?.Keys.ToList() ?? new List<string>();
+            var members = await _databaseService.GetUsersByIdsAsync(memberIds);
+            GroupMembersList.ItemsSource = members.Select(u => u.DisplayName).ToList();
+            GroupMembersList.Visibility = members.Any() ? Visibility.Visible : Visibility.Collapsed;
+
+            // 3. Nếu là admin thì cập nhật danh sách pending
+            bool isAdmin = _selectedGroup.Members.TryGetValue(App.CurrentUser.Id, out var role) && role == "admin";
+            if (isAdmin)
             {
-                GroupMembersList.ItemsSource = _selectedGroup.Members;
-                GroupMembersList.Visibility = GroupMembersList.Visibility == Visibility.Visible
-                    ? Visibility.Collapsed
-                    : Visibility.Visible;
+                var pendingIds = _selectedGroup.PendingMembers?.Keys.ToList() ?? new List<string>();
+                var pendingUsers = await _databaseService.GetUsersByIdsAsync(pendingIds);
+                var pendingModels = pendingUsers.Select(u => new PendingMemberModel
+                {
+                    Id = u.Id,
+                    DisplayName = u.DisplayName
+                }).ToList();
+
+                PendingMembersListBox.ItemsSource = pendingModels;
+
+                bool hasPending = pendingModels.Any();
+                PendingMembersLabel.Visibility = hasPending ? Visibility.Visible : Visibility.Collapsed;
+                PendingMembersListBox.Visibility = hasPending ? Visibility.Visible : Visibility.Collapsed;
+                ApproveSelectedButton.Visibility = hasPending ? Visibility.Visible : Visibility.Collapsed;
+                RejectSelectedButton.Visibility = hasPending ? Visibility.Visible : Visibility.Collapsed;
+            }
+            else
+            {
+                PendingMembersLabel.Visibility = Visibility.Collapsed;
+                PendingMembersListBox.Visibility = Visibility.Collapsed;
+                ApproveSelectedButton.Visibility = Visibility.Collapsed;
+                RejectSelectedButton.Visibility = Visibility.Collapsed;
             }
         }
 
-        private void InviteMemberButton_Click(object sender, RoutedEventArgs e)
+        private void UpdateGroupMemberCount()
         {
-            
+            int memberCount = _selectedGroup.Members?.Count ?? 0;
+            GroupMemberCount.Text = $"Members: {memberCount} members";
         }
+
+
+        private void ToggleVisibility(UIElement element, bool visible)
+        {
+            element.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+
+        private async void ViewMembersButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedGroup == null)
+            {
+                MessageBox.Show("No group selected.");
+                return;
+            }
+
+            bool isVisible = GroupMembersList.Visibility == Visibility.Visible || PendingMembersListBox.Visibility == Visibility.Visible;
+
+            if (isVisible)
+            {
+                GroupMembersList.ItemsSource = null;
+                PendingMembersListBox.ItemsSource = null;
+
+                ToggleVisibility(GroupMembersList, false);
+                ToggleVisibility(PendingMembersListBox, false);
+                ToggleVisibility(PendingMembersLabel, false);
+                ToggleVisibility(ApproveSelectedButton, false);
+                ToggleVisibility(RejectSelectedButton, false);
+                return;
+            }
+
+            await RefreshGroupUIAsync();
+        }
+
+
+
+        private async void ApproveSelectedPendingMembers_Click(object sender, RoutedEventArgs e)
+        {
+            if (PendingMembersListBox.ItemsSource is IEnumerable<PendingMemberModel> pendingMembers)
+            {
+                var selectedMembers = pendingMembers.Where(m => m.IsSelected).ToList();
+                if (!selectedMembers.Any())
+                {
+                    MessageBox.Show("Vui lòng chọn ít nhất một thành viên để duyệt.");
+                    return;
+                }
+
+                try
+                {
+                    foreach (var member in selectedMembers)
+                        await _databaseService.ApproveMemberAsync(_selectedGroup.GroupId, member.Id);
+
+                    MessageBox.Show($"Đã duyệt {selectedMembers.Count} thành viên.");
+                    await RefreshGroupUIAsync();
+                    UpdateGroupMemberCount();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Lỗi khi duyệt thành viên: " + ex.Message);
+                }
+            }
+        }
+
+
+
+        private async void ApprovePendingMember_Click(object sender, RoutedEventArgs e)
+        {
+            if (PendingMembersListBox.SelectedItem is PendingMemberModel selectedMember)
+            {
+                try
+                {
+                    await _databaseService.ApproveMemberAsync(_selectedGroup.GroupId, selectedMember.Id);
+                    MessageBox.Show($"Đã duyệt thành viên {selectedMember.DisplayName} vào nhóm.");
+                    await RefreshGroupUIAsync();
+                    UpdateGroupMemberCount();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Lỗi khi duyệt thành viên: " + ex.Message);
+                }
+            }
+        }
+
+
+        private async void RejectSelectedPendingMembers_Click(object sender, RoutedEventArgs e)
+        {
+            if (PendingMembersListBox.ItemsSource is IEnumerable<PendingMemberModel> pendingMembers)
+            {
+                var selectedMembers = pendingMembers.Where(m => m.IsSelected).ToList();
+                if (!selectedMembers.Any())
+                {
+                    MessageBox.Show("Vui lòng chọn ít nhất một thành viên để từ chối.");
+                    return;
+                }
+
+                try
+                {
+                    foreach (var member in selectedMembers)
+                        await _databaseService.RejectMemberAsync(_selectedGroup.GroupId, member.Id);
+
+                    MessageBox.Show($"Đã từ chối {selectedMembers.Count} thành viên.");
+                    await RefreshGroupUIAsync();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Lỗi khi từ chối thành viên: " + ex.Message);
+                }
+            }
+        }
+
+
+        private async Task<List<InviteFriendModel>> LoadAvailableFriendsAsync()
+        {
+            var friends = _users;
+            var existingMembers = await _databaseService.GetGroupMembersAsync(_selectedGroup.GroupId);
+            var pendingMembers = await _databaseService.GetGroupPendingMembersAsync(_selectedGroup.GroupId);
+
+            var availableFriends = friends
+                .Where(f => !existingMembers.Contains(f.Id) && !pendingMembers.Contains(f.Id))
+                .Select(f => new InviteFriendModel
+                {
+                    Id = f.Id,
+                    DisplayName = f.DisplayName
+                })
+                .ToList();
+
+            return availableFriends;
+        }
+
+
+
+        private async void InviteMemberButton_Click(object sender, RoutedEventArgs e)
+        {
+            bool isVisible = FriendCheckboxList.Visibility == Visibility.Visible;
+
+            // Toggle visibility
+            FriendCheckboxList.Visibility = isVisible ? Visibility.Collapsed : Visibility.Visible;
+            ConfirmInviteButton.Visibility = isVisible ? Visibility.Collapsed : Visibility.Visible;
+            InviteFriendLabel.Visibility = isVisible ? Visibility.Collapsed : Visibility.Visible;
+
+            if (isVisible) return;
+
+            try
+            {
+                var availableFriends = await LoadAvailableFriendsAsync();
+                FriendCheckboxList.ItemsSource = availableFriends;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi khi tải danh sách bạn bè: " + ex.Message);
+            }
+        }
+
+
+
+
+        private async void ConfirmInvite_Click(object sender, RoutedEventArgs e)
+        {
+            var groupId = _selectedGroup.GroupId;
+            var inviterId = App.CurrentUser.Id;
+
+            var selectedFriends = FriendCheckboxList.Items
+                .Cast<InviteFriendModel>()
+                .Where(f => f.IsSelected)
+                .ToList();
+
+            int invitedCount = 0;
+
+            foreach (var friend in selectedFriends)
+            {
+                try
+                {
+                    await _databaseService.InviteMemberToGroupAsync(groupId, inviterId, friend.Id);
+                    invitedCount++;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Lỗi khi mời {friend.DisplayName}: {ex.Message}");
+                }
+            }
+
+            MessageBox.Show($"Đã mời {invitedCount} người!");
+
+            // Làm mới danh sách bạn bè có thể mời
+            var updatedFriends = await LoadAvailableFriendsAsync();
+            FriendCheckboxList.ItemsSource = updatedFriends;
+
+            // Nếu người mời là admin, cập nhật lại thông tin nhóm và member count
+            if (_selectedGroup.Members.TryGetValue(inviterId, out var role) && role == "admin")
+            {
+                _selectedGroup = await _databaseService.GetGroupAsync(groupId); // lấy lại dữ liệu nhóm mới
+                UpdateGroupMemberCount();
+            }
+        }
+
+
+
+
+
+
 
         private void LeaveGroupButton_Click(object sender, RoutedEventArgs e)
         {
