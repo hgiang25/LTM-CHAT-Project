@@ -1352,13 +1352,33 @@
                             <ListBox x:Name="GroupMembersList" Margin="10,5,0,0" Visibility="Collapsed" Height="200">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock FontSize="14" Foreground="Black" Margin="5,2,0,0">
-                <Run Text="• " />
-                <Run Text="{Binding Mode=OneWay}" /> <!-- Explicitly set OneWay binding -->
-                                        </TextBlock>
+                                        <Grid Margin="5,2,5,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock Grid.Column="0" FontSize="14" Foreground="Black">
+                    <Run Text="• " />
+                    <Run Text="{Binding DisplayName}" />
+                                            </TextBlock>
+
+                                            <Button Grid.Column="1" Content="X" 
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center"
+                                                Margin="20,0,0,0"
+                                                FontWeight="Bold"
+                                                Foreground="Red"
+                                                Background="Transparent"
+                                                BorderBrush="Transparent"
+                                                Cursor="Hand"
+                                                Tag="{Binding Id}"
+                                                Click="RemoveMemberButton_Click"/>
+                                        </Grid>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
+
 
                             <TextBlock x:Name="PendingMembersLabel" Text="Pending Members" FontWeight="Bold"
                             FontSize="14" Margin="10,10,0,5" Visibility="Collapsed" />

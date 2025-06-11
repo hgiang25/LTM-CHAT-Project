@@ -897,6 +897,39 @@ namespace ChatApp.Services
             }
         }
 
+        public async Task RemoveMemberFromGroupAsync(string groupId, string userId)
+        {
+            var groupRef = _firestoreDb.Collection("groups").Document(groupId);
+
+            await _firestoreDb.RunTransactionAsync(async transaction =>
+            {
+                var snapshot = await transaction.GetSnapshotAsync(groupRef);
+                if (!snapshot.Exists)
+                {
+                    throw new Exception("Nhóm không tồn tại.");
+                }
+
+                // ✅ Đọc đúng kiểu Dictionary<string, string>
+                var members = snapshot.GetValue<Dictionary<string, string>>("members");
+
+                if (!members.ContainsKey(userId))
+                {
+                    throw new Exception("Thành viên không tồn tại trong nhóm.");
+                }
+
+                members.Remove(userId);
+
+                transaction.Update(groupRef, new Dictionary<string, object>
+                {
+                    { "members", members },
+                    { "memberCount", members.Count }
+                });
+            });
+        }
+
+
+
+
         public async Task InviteMemberToGroupAsync(string groupId, string inviterId, string targetUserId)
         {
             var groupRef = _firestoreDb.Collection("groups").Document(groupId);

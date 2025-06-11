@@ -2103,18 +2103,18 @@ namespace UI_Chat_App
         {
             // 1. Lấy lại dữ liệu nhóm
             _selectedGroup = await _databaseService.GetGroupAsync(_selectedGroup.GroupId);
-            //GroupMemberCount.Text = $"Members: {_selectedGroup.MemberCount} members";
 
             // 2. Cập nhật danh sách thành viên
             var memberIds = _selectedGroup.Members?.Keys.ToList() ?? new List<string>();
             var members = await _databaseService.GetUsersByIdsAsync(memberIds);
-            GroupMembersList.ItemsSource = members.Select(u => u.DisplayName).ToList();
+            GroupMembersList.ItemsSource = members;
             GroupMembersList.Visibility = members.Any() ? Visibility.Visible : Visibility.Collapsed;
 
-            // 3. Nếu là admin thì cập nhật danh sách pending
+            // 3. Nếu là admin thì cập nhật danh sách pending và danh sách bạn bè có thể mời
             bool isAdmin = _selectedGroup.Members.TryGetValue(App.CurrentUser.Id, out var role) && role == "admin";
             if (isAdmin)
             {
+                // 3.1 Cập nhật danh sách thành viên chờ duyệt
                 var pendingIds = _selectedGroup.PendingMembers?.Keys.ToList() ?? new List<string>();
                 var pendingUsers = await _databaseService.GetUsersByIdsAsync(pendingIds);
                 var pendingModels = pendingUsers.Select(u => new PendingMemberModel
@@ -2130,6 +2130,10 @@ namespace UI_Chat_App
                 PendingMembersListBox.Visibility = hasPending ? Visibility.Visible : Visibility.Collapsed;
                 ApproveSelectedButton.Visibility = hasPending ? Visibility.Visible : Visibility.Collapsed;
                 RejectSelectedButton.Visibility = hasPending ? Visibility.Visible : Visibility.Collapsed;
+
+                // ✅ 3.2 Cập nhật lại danh sách bạn bè có thể mời
+                var availableFriends = await LoadAvailableFriendsAsync();
+                FriendCheckboxList.ItemsSource = availableFriends;
             }
             else
             {
@@ -2139,6 +2143,7 @@ namespace UI_Chat_App
                 RejectSelectedButton.Visibility = Visibility.Collapsed;
             }
         }
+
 
         private void UpdateGroupMemberCount()
         {
@@ -2177,6 +2182,46 @@ namespace UI_Chat_App
             }
 
             await RefreshGroupUIAsync();
+        }
+
+        private async void RemoveMemberButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is string userId)
+            {
+                bool isAdmin = _selectedGroup.Members.TryGetValue(App.CurrentUser.Id, out var role) && role == "admin";
+                if (!isAdmin)
+                {
+                    MessageBox.Show("Chỉ admin mới có quyền xoá thành viên khỏi nhóm.");
+                    return;
+                }
+
+                if (userId == App.CurrentUser.Id)
+                {
+                    MessageBox.Show("Bạn không thể tự xoá chính mình khỏi nhóm.");
+                    return;
+                }
+
+                
+
+                var result = MessageBox.Show("Bạn có chắc muốn xoá thành viên này khỏi nhóm?",
+                                             "Xác nhận xoá",
+                                             MessageBoxButton.YesNo,
+                                             MessageBoxImage.Warning);
+                if (result != MessageBoxResult.Yes) return;
+
+                try
+                {
+                    await _databaseService.RemoveMemberFromGroupAsync(_selectedGroup.GroupId, userId);
+                    MessageBox.Show("Đã xoá thành viên.");
+                    _selectedGroup = await _databaseService.GetGroupAsync(_selectedGroup.GroupId);
+                    UpdateGroupMemberCount();
+                    await RefreshGroupUIAsync();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Lỗi khi xoá thành viên: " + ex.Message);
+                }
+            }
         }
 
 
@@ -2337,6 +2382,7 @@ namespace UI_Chat_App
             {
                 _selectedGroup = await _databaseService.GetGroupAsync(groupId); // lấy lại dữ liệu nhóm mới
                 UpdateGroupMemberCount();
+                await RefreshGroupUIAsync();
             }
         }
 

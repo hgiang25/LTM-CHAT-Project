@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using Google.Cloud.Firestore;
+using UI_Chat_App;
 
 namespace ChatApp.Models
 {
@@ -60,7 +61,8 @@ namespace ChatApp.Models
         {
             get => _isOnline;
             set { _isOnline = value; OnPropertyChanged(nameof(IsOnline)); }
-        }
+        }       
+
 
         public event PropertyChangedEventHandler PropertyChanged;
 
