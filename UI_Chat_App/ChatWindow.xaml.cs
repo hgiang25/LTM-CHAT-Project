@@ -70,13 +70,7 @@ namespace UI_Chat_App
             _notifications = new ObservableCollection<NotificationData>();
             Loaded += ChatWindow_Loaded;
             Closing += Window_Closing;
-            _chatrooms = new ObservableCollection<object> { };
-            // Timer cho bạn bè và lời mời
-            //_refreshTimer = new DispatcherTimer
-            //{
-            //    Interval = TimeSpan.FromSeconds(15) // Cập nhật bạn bè/lời mời mỗi 60 giây
-            //};
-            //_refreshTimer.Tick += RefreshFriendsAndRequests_Tick;
+            _chatrooms = new ObservableCollection<object> { };            
         }
 
         // Thay thế ChatWindow_Loaded
@@ -167,11 +161,10 @@ namespace UI_Chat_App
                         NotificationCountText.Visibility = unreadCount > 0 ? Visibility.Visible : Visibility.Collapsed;
                     });
                 });
-
-
                 // Tải dữ liệu ban đầu
                 await RefreshFriendsAndRequestsAsync();                
                 await LoadAllUsersAsync();
+                //StartListeningToUserGroups();
             }
             catch (Exception ex)
             {
@@ -184,51 +177,7 @@ namespace UI_Chat_App
         {
             await RefreshFriendsAndRequestsAsync();
             //await RefreshGroupsAsync();
-        }       
-
-        private async Task RefreshGroupsAsync()
-        {
-            try
-            {
-                // Lấy danh sách nhóm mà người dùng là thành viên
-                var groups = await _databaseService.GetGroupsForUserAsync(App.CurrentUser.Id);
-
-                if (groups != null)
-                {
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        _groups.Clear();
-                        foreach (var group in groups)
-                        {
-                            // Nếu chưa có avatar cho nhóm thì gán mặc định
-                            if (string.IsNullOrEmpty(group.Avatar))
-                            {
-                                group.Avatar = "Icons/group.png";
-                            }
-                            _groups.Add(group);
-                        }
-
-                        // Làm mới danh sách phòng chat tổng hợp (bạn bè + nhóm)
-                        _chatrooms.Clear();
-                        foreach (var user in _users)
-                        {
-                            _chatrooms.Add(user);
-                        }
-                        foreach (var group in _groups)
-                        {
-                            _chatrooms.Add(group);
-                        }
-
-                        // Áp dụng lại template selector
-                        UserListBox.ItemsSource = _chatrooms;
-                    });
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Failed to refresh groups: {ex.Message}");
-            }
-        }
+        }               
 
 
         private async Task RefreshFriendsAndRequestsAsync()
@@ -674,6 +623,19 @@ namespace UI_Chat_App
                             });
                         }
                         break;
+
+                    case "System":
+                        stack.Children.Add(new TextBlock
+                        {
+                            Text = message.Content,
+                            FontSize = 14,
+                            Foreground = Brushes.DarkSlateGray,
+                            FontStyle = FontStyles.Italic,
+                            TextAlignment = TextAlignment.Center,
+                            TextWrapping = TextWrapping.Wrap,
+                            Margin = new Thickness(10)
+                        });
+                        break;
                 }
 
                 // Thêm thời gian gửi
@@ -782,11 +744,35 @@ namespace UI_Chat_App
 
         private UIElement CreateMessageBubble(string text, string time, bool isMine, bool isSeen = false, string messageType = "Text", string fileUrl = null)
         {
+            // Tin nhắn hệ thống
+            if (messageType == "System")
+            {
+                var textBlock = new TextBlock
+                {
+                    Text = text,
+                    FontSize = 14,
+                    FontStyle = FontStyles.Italic,
+                    Foreground = Brushes.Gray,
+                    TextAlignment = TextAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(5)
+                };
+
+                return new Border
+                {
+                    Background = Brushes.Transparent,
+                    Padding = new Thickness(5),
+                    Margin = new Thickness(5),
+                    Child = textBlock,
+                    HorizontalAlignment = HorizontalAlignment.Center
+                };
+            }
+
+            // Tin nhắn người dùng
             var stack = new StackPanel();
 
             if (messageType == "Image" && !string.IsNullOrEmpty(fileUrl))
             {
-                // Hiển thị hình ảnh emoji
                 var image = new Image
                 {
                     Source = new BitmapImage(new Uri(fileUrl, UriKind.RelativeOrAbsolute)),
@@ -799,7 +785,6 @@ namespace UI_Chat_App
             }
             else
             {
-                // Hiển thị tin nhắn văn bản
                 var textBlock = new TextBlock
                 {
                     Text = text,
@@ -808,24 +793,22 @@ namespace UI_Chat_App
                     Margin = new Thickness(0),
                     Padding = new Thickness(10),
                     TextAlignment = TextAlignment.Left,
-                    HorizontalAlignment = HorizontalAlignment.Left,
                     TextWrapping = TextWrapping.Wrap
                 };
                 stack.Children.Add(textBlock);
             }
 
             // Thời gian gửi
-            var timeBlock = new TextBlock
+            stack.Children.Add(new TextBlock
             {
                 Text = time,
                 FontSize = 10,
                 Foreground = Brushes.Gray,
                 HorizontalAlignment = HorizontalAlignment.Right,
                 Margin = new Thickness(0, 5, 0, 0)
-            };
-            stack.Children.Add(timeBlock);
+            });
 
-            // Trạng thái seen
+            // Trạng thái seen (nếu là của mình)
             if (isMine && isSeen)
             {
                 stack.Children.Add(new TextBlock
@@ -837,26 +820,18 @@ namespace UI_Chat_App
                 });
             }
 
-            // Bọc trong Border
-            var border = new Border
+            return new Border
             {
-                Background = isMine ? Brushes.LightGreen : Brushes.White,
+                Background = isMine ? Brushes.LightBlue : Brushes.LightGray,
                 CornerRadius = new CornerRadius(10),
-                Padding = new Thickness(10),
                 Margin = new Thickness(5),
-                MaxWidth = 300,
+                Padding = new Thickness(10),
                 Child = stack,
-                HorizontalAlignment = isMine ? HorizontalAlignment.Right : HorizontalAlignment.Left,
-                Effect = new System.Windows.Media.Effects.DropShadowEffect
-                {
-                    BlurRadius = 5,
-                    Opacity = 0.2,
-                    ShadowDepth = 2
-                }
+                MaxWidth = 300,
+                HorizontalAlignment = isMine ? HorizontalAlignment.Right : HorizontalAlignment.Left
             };
-
-            return border;
         }
+
 
 
 
@@ -1186,6 +1161,7 @@ namespace UI_Chat_App
                     await _typingStatusListener.StopAsync();
                     _typingStatusListener = null;
                 }
+                //await _databaseService.StopListeningToUserGroupsAsync();
 
             }
             catch (Exception ex)
@@ -1253,6 +1229,7 @@ namespace UI_Chat_App
                     Console.WriteLine($"Set IsOnline = false for user {App.CurrentUser.Id} on logout.");
                 }
                 await _databaseService.StopListeningForNotificationsAsync();
+                //await _databaseService.StopListeningToUserGroupsAsync();
                 // Đóng cửa sổ hiện tại và mở lại cửa sổ đăng nhập
                 var mainWindow = new MainWindow(); // Đã sửa từ LoginWindow thành MainWindow
                 mainWindow.Show();
@@ -2213,6 +2190,11 @@ namespace UI_Chat_App
                 {
                     await _databaseService.RemoveMemberFromGroupAsync(_selectedGroup.GroupId, userId);
                     MessageBox.Show("Đã xoá thành viên.");
+                    var displayName = await GetUserNameById(userId);
+                    await _databaseService.SendSystemMessageToChatAsync(
+                        _selectedGroup.GroupId,
+                        $"{displayName} đã bị xoá khỏi nhóm bởi {App.CurrentUser.DisplayName}."
+                    );
                     _selectedGroup = await _databaseService.GetGroupAsync(_selectedGroup.GroupId);
                     UpdateGroupMemberCount();
                     await RefreshGroupUIAsync();
@@ -2364,6 +2346,10 @@ namespace UI_Chat_App
                 {
                     await _databaseService.InviteMemberToGroupAsync(groupId, inviterId, friend.Id);
                     invitedCount++;
+                    await _databaseService.SendSystemMessageToChatAsync(
+                        _currentChatRoomId,
+                        $"👥 {App.CurrentUser.DisplayName} đã thêm {friend.DisplayName} vào nhóm."
+                    );
                 }
                 catch (Exception ex)
                 {
@@ -2392,10 +2378,172 @@ namespace UI_Chat_App
 
 
 
-        private void LeaveGroupButton_Click(object sender, RoutedEventArgs e)
+        private async void LeaveGroupButton_Click(object sender, RoutedEventArgs e)
         {
-            
+            var currentUserId = App.CurrentUser.Id;
+
+            // Cập nhật lại dữ liệu nhóm từ Firestore
+            _selectedGroup = await _databaseService.GetGroupAsync(_selectedGroup.GroupId);
+
+            // Kiểm tra quyền sau khi đã có dữ liệu mới nhất
+            bool isAdmin = _selectedGroup.Members.TryGetValue(currentUserId, out var role) && role == "admin";
+
+
+            if (isAdmin)
+            {
+                if (_selectedGroup.Members.Count <= 1)
+                {
+                    MessageBox.Show("Bạn là thành viên duy nhất. Không thể rời nhóm.");
+                    return;
+                }
+
+                // Tạo danh sách thành viên khác
+                var otherMembers = _selectedGroup.Members
+                    .Where(kvp => kvp.Key != currentUserId)
+                    .ToList();
+
+                // Lấy tên hiển thị (nếu cần bạn có thể cache UserData từ trước)
+                var users = await _databaseService.GetUsersByIdsAsync(otherMembers.Select(m => m.Key).ToList());
+                var memberOptions = users.ToDictionary(u => u.Id, u => u.DisplayName);
+
+                // Tạo cửa sổ popup chọn admin mới
+                var window = new Window
+                {
+                    Title = "Chọn admin mới",
+                    Width = 300,
+                    Height = 180,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                    ResizeMode = ResizeMode.NoResize,
+                    Owner = Application.Current.MainWindow
+                };
+
+                var stack = new StackPanel { Margin = new Thickness(10) };
+                var label = new TextBlock { Text = "Chọn thành viên để chuyển quyền admin:", Margin = new Thickness(0, 0, 0, 10) };
+                var comboBox = new ComboBox
+                {
+                    ItemsSource = memberOptions,
+                    DisplayMemberPath = "Value",
+                    SelectedValuePath = "Key",
+                    Margin = new Thickness(0, 0, 0, 10)
+                };
+                var confirmButton = new Button { Content = "Xác nhận", Height = 30, Width = 100, HorizontalAlignment = HorizontalAlignment.Center };
+
+                confirmButton.Click += (s, args) =>
+                {
+                    if (comboBox.SelectedValue is string newAdminId)
+                    {
+                        window.Tag = newAdminId;
+                        window.DialogResult = true;
+                        window.Close();
+                    }
+                    else
+                    {
+                        MessageBox.Show("Vui lòng chọn một thành viên.");
+                    }
+                };
+
+                stack.Children.Add(label);
+                stack.Children.Add(comboBox);
+                stack.Children.Add(confirmButton);
+                window.Content = stack;
+
+                if (window.ShowDialog() == true && window.Tag is string selectedAdminId)
+                {
+                    try
+                    {
+                        await _databaseService.ChangeGroupAdminAsync(_selectedGroup.GroupId, currentUserId, selectedAdminId);
+                        await _databaseService.RemoveMemberFromGroupAsync(_selectedGroup.GroupId, currentUserId);
+                        MessageBox.Show("Bạn đã rời nhóm và chuyển quyền admin thành công.");
+                        await RefreshGroupUIAsync();
+                        await RefreshFriendsAndRequestsAsync();
+                        await _databaseService.SendSystemMessageToChatAsync(
+                            _selectedGroup.GroupId,
+                            $"{App.CurrentUser.DisplayName} đã rời nhóm và chuyển quyền admin cho {App.CurrentUser.DisplayName}."
+                        );
+
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Lỗi khi rời nhóm: " + ex.Message);
+                    }
+                }
+            }
+            else
+            {
+                var confirm = MessageBox.Show("Bạn có chắc muốn rời nhóm?", "Xác nhận", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                if (confirm != MessageBoxResult.Yes) return;
+
+                try
+                {
+                    await _databaseService.RemoveMemberFromGroupAsync(_selectedGroup.GroupId, currentUserId);
+                    MessageBox.Show("Bạn đã rời nhóm.");
+                    await RefreshGroupUIAsync();
+                    await RefreshFriendsAndRequestsAsync();
+                    await _databaseService.SendSystemMessageToChatAsync(
+                        _selectedGroup.GroupId,
+                        $"{App.CurrentUser.DisplayName} đã rời nhóm."
+                    );
+
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Lỗi khi rời nhóm: " + ex.Message);
+                }
+            }
         }
+
+        private async void StartListeningToUserGroups()
+        {
+            await _databaseService.StopListeningToUserGroupsAsync();
+
+            _databaseService.ListenToUserGroups(App.CurrentUser.Id, async groups =>
+            {
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    // ✅ Tránh Clear() nếu dữ liệu mới là rỗng và cũ đang có
+                    if (groups.Count == 0 && _groups.Count > 0)
+                    {
+                        Console.WriteLine("⚠️ Snapshot trả về rỗng, giữ nguyên danh sách nhóm cũ.");
+                        return;
+                    }
+
+                    // ✅ Cập nhật nếu có thay đổi thật sự
+                    if (!_groups.SequenceEqual(groups, new GroupDataComparer()))
+                    {
+                        _groups.Clear();
+                        foreach (var group in groups)
+                            _groups.Add(group);
+
+                        UpdateChatroomList();
+                    }
+                });
+            });
+        }
+
+
+
+
+
+        private async void UpdateChatroomList()
+        {
+            var newChatrooms = new ObservableCollection<object>(_users.Cast<object>().Concat(_groups));
+
+            // 🔍 So sánh toàn bộ danh sách mới và cũ
+            if (!_chatrooms.SequenceEqual(newChatrooms, new ChatroomComparer()))
+            {
+                _chatrooms.Clear();
+                foreach (var chatroom in newChatrooms)
+                    _chatrooms.Add(chatroom);
+            }
+
+            // 👉 Đảm bảo binding vẫn đúng
+            if (UserListBox.ItemsSource != _chatrooms)
+                UserListBox.ItemsSource = _chatrooms;
+        }
+
+
+
+
 
     }
 }

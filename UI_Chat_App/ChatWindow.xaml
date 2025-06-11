@@ -1433,7 +1433,9 @@
                                 Visibility="Collapsed"
                                 x:Name="ConfirmInviteButton"/>      
 
-                            <Button x:Name="LeaveGroupButton" Content="🚪 Leave Group" Margin="0,5" Height="35" Click="LeaveGroupButton_Click" Style="{StaticResource WindowButtonStyle}" Foreground="Red"/>
+                            <Button x:Name="LeaveGroupButton" Content="🚪 Leave Group" Margin="0,5" Height="35" 
+                                    Click="LeaveGroupButton_Click" Style="{StaticResource WindowButtonStyle}" 
+                                    Foreground="Red"/>
                         </StackPanel>
                     </StackPanel>
                 </ScrollViewer>

@@ -1116,74 +1116,126 @@ namespace ChatApp.Services
             return users;
         }
 
-
-
-        //    public async Task<List<GroupData>> SearchGroupsByNameAsync(string keyword)
-        //    {
-        //        var groupsRef = _firestoreDb.Collection("groups");
-        //        var query = await groupsRef
-        //            .WhereGreaterThanOrEqualTo("name", keyword)
-        //            .WhereLessThanOrEqualTo("name", keyword + "\uf8ff")
-        //            .GetSnapshotAsync();
-
-        //        var results = new List<GroupData>();
-        //        foreach (var doc in query.Documents)
-        //        {
-        //            var dict = doc.ToDictionary();
-        //            results.Add(new GroupData
-        //            {
-        //                GroupId = doc.Id,
-        //                Name = dict["name"] as string,
-        //                CreatedBy = dict["createdBy"] as string,
-        //                CreatedAt = dict.ContainsKey("createdAt") && dict["createdAt"] is Timestamp ts ? ts : default,
-        //                Members = dict.ContainsKey("members") ? ((Dictionary<string, object>)dict["members"])
-        //                    .ToDictionary(kv => kv.Key, kv => kv.Value.ToString()) : new Dictionary<string, string>()
-        //            });
-        //        }
-
-        //        return results;
-        //    }
-
-        //    public async Task SendGroupMessageAsync(string groupId, MessageData message)
-        //    {
-        //        var messagesRef = _firestoreDb.Collection("groups").Document(groupId).Collection("messages");
-        //        var docRef = messagesRef.Document();
-        //        message.MessageId = docRef.Id;
-        //        message.Timestamp = Timestamp.GetCurrentTimestamp();
-
-        //        await docRef.SetAsync(message);
-        //    }
-
-
-        private FirestoreChangeListener _groupMessageListener;
-
-        public void ListenToGroupMessages(string groupId, Action<MessageData> onMessageReceived)
+        public async Task ChangeGroupAdminAsync(string groupId, string oldAdminId, string newAdminId)
         {
-            var messagesRef = _firestoreDb
-                .Collection("groups")
-                .Document(groupId)
-                .Collection("messages")
-                .OrderBy("timestamp");
+            var groupRef = _firestoreDb.Collection("groups").Document(groupId);
 
-            _groupMessageListener = messagesRef.Listen(snapshot =>
+            await _firestoreDb.RunTransactionAsync(async transaction =>
             {
-                foreach (var change in snapshot.Changes)
-                {
-                    if (change.ChangeType == Google.Cloud.Firestore.DocumentChange.Type.Added)
-                    {
-                        var message = change.Document.ConvertTo<MessageData>();
-                        onMessageReceived?.Invoke(message); // Cập nhật UI
-                    }
-                }
+                var snapshot = await transaction.GetSnapshotAsync(groupRef);
+                if (!snapshot.Exists)
+                    throw new Exception("Nhóm không tồn tại.");
+
+                var data = snapshot.ToDictionary();
+                var members = data["members"] as Dictionary<string, object>;
+
+                if (!members.ContainsKey(oldAdminId))
+                    throw new Exception("Admin cũ không tồn tại."); // Lỗi nằm ở đây nếu bạn đã xoá trước
+
+                if (!members.ContainsKey(newAdminId))
+                    throw new Exception("Admin mới không tồn tại.");
+
+                members[oldAdminId] = "member";
+                members[newAdminId] = "admin";
+
+                transaction.Update(groupRef, new Dictionary<string, object>
+        {
+            { "members", members }
+        });
             });
         }
 
-        // Gọi khi rời nhóm hoặc đổi nhóm
-        public void StopListeningToMessages()
+        private FirestoreChangeListener _userGroupsListener;
+
+        public void ListenToUserGroups(string userId, Action<List<GroupData>> onGroupsChanged)
         {
-            _groupMessageListener?.StopAsync();
-            _groupMessageListener = null;
+            var groupsRef = _firestoreDb.Collection("groups");
+
+            // Lắng nghe mọi thay đổi trong tập hợp nhóm
+            _userGroupsListener = groupsRef.Listen(async snapshot =>
+            {
+                Console.WriteLine($"📥 Received group snapshot: {snapshot.Documents.Count} documents");
+
+                var userGroups = new List<GroupData>();
+
+                foreach (var doc in snapshot.Documents)
+                {
+                    if (doc.Exists)
+                    {
+                        var group = doc.ConvertTo<GroupData>();
+
+                        if (group.Members != null)
+                            Console.WriteLine($"✅ Group: {group.GroupId} | Members: {string.Join(",", group.Members.Keys)}");
+
+                        if (group.Members != null && group.Members.ContainsKey(userId))
+                        {
+                            userGroups.Add(group);
+                        }
+                    }
+                }
+
+                Console.WriteLine($"✅ User {userId} belongs to {userGroups.Count} groups");
+                onGroupsChanged?.Invoke(userGroups);
+            });
+
         }
+
+        public async Task StopListeningToUserGroupsAsync()
+        {
+            if (_userGroupsListener != null)
+            {
+                await _userGroupsListener.StopAsync();
+                _userGroupsListener = null;
+            }
+        }
+
+        public async Task SendSystemMessageToChatAsync(string chatRoomId, string content)
+        {
+            var message = new MessageData
+            {
+                SenderId = "system",
+                ReceiverId = null,
+                Content = content,
+                Timestamp = Timestamp.GetCurrentTimestamp(),
+                MessageType = "System",
+                IsSeen = true
+            };
+
+            await SaveMessageAsync(chatRoomId, message, ""); // Truyền rỗng vì không cần idToken
+        }
+
+
+
+
+        //private FirestoreChangeListener _groupMessageListener;
+
+        //public void ListenToGroupMessages(string groupId, Action<MessageData> onMessageReceived)
+        //{
+        //    var messagesRef = _firestoreDb
+        //        .Collection("groups")
+        //        .Document(groupId)
+        //        .Collection("messages")
+        //        .OrderBy("timestamp");
+
+        //    _groupMessageListener = messagesRef.Listen(snapshot =>
+        //    {
+        //        foreach (var change in snapshot.Changes)
+        //        {
+        //            if (change.ChangeType == Google.Cloud.Firestore.DocumentChange.Type.Added)
+        //            {
+        //                var message = change.Document.ConvertTo<MessageData>();
+        //                onMessageReceived?.Invoke(message); // Cập nhật UI
+        //            }
+        //        }
+        //    });
+        //}
+
+        //// Gọi khi rời nhóm hoặc đổi nhóm
+        //public void StopListeningToMessages()
+        //{
+        //    _groupMessageListener?.StopAsync();
+        //    _groupMessageListener = null;
+        //}
 
 
         public FirestoreDb GetDb() => _firestoreDb;
