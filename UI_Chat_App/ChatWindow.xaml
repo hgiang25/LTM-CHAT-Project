@@ -494,7 +494,7 @@
                                      GroupTemplate="{StaticResource GroupBoxTemplate}"/>
 
     </Window.Resources>
-    <Border Background="DarkGray" CornerRadius="30">
+    <Border Background="#e0ffff" CornerRadius="30">
         <Grid>
             <Grid.Triggers>
                 <EventTrigger RoutedEvent="Loaded">
@@ -547,7 +547,7 @@
             </Grid>
 
             <!-- Cột danh sách người dùng -->
-            <Border Grid.Row="1" Grid.Column="0" Background="WhiteSmoke" CornerRadius="20,0,0,30" Margin="10,10,0,10">
+            <Border Grid.Row="1" Grid.Column="0" Background="	#dcdcdc" CornerRadius="20,20,20,20" Margin="5">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -583,7 +583,7 @@
             Style="{StaticResource WindowButtonStyle}">
                             <Image Source="Icons/search.png" Width="20" Height="20"/>
                         </Button>
-                        
+
                         <!--Nút notification-->
                         <Button x:Name="NotificationButton"
                             Width="30" Height="30"
@@ -608,7 +608,7 @@
                                            Visibility="Collapsed"
                                            Width="14" Height="14"
                                            Padding="0"
-                                           ClipToBounds="True"/>            
+                                           ClipToBounds="True"/>
                             </Grid>
                         </Button>
                         <Popup x:Name="NotificationPopup"
@@ -623,7 +623,7 @@
                                     CornerRadius="10"
                                     Padding="10"
                                     Width="250" Height="300"
-                                    SnapsToDevicePixels="True"> 
+                                    SnapsToDevicePixels="True">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                                     <StackPanel x:Name="NotificationListPanel">
                                         <!-- Các item  thông báo sẽ được thêm tại đây từ C# -->
@@ -631,13 +631,58 @@
                                 </ScrollViewer>
                             </Border>
                         </Popup>
-
                     </Grid>
-
-
 
                     <!-- TabControl cho danh sách bạn bè và thêm bạn -->
                     <TabControl x:Name="TabControl" Grid.Row="1" SelectionChanged="TabControl_SelectionChanged">
+                        <TabControl.Resources>
+                            <Style TargetType="TabItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                <Setter Property="Foreground" Value="Black"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="TabItem">
+                                            <Border x:Name="Border"
+                                                    Background="{TemplateBinding Background}"
+                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="10"
+                                                    Padding="8">
+                                                <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          ContentSource="Header"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="Border" Property="Background" Value="#FFDDDDDD"/>
+                                                    <Setter TargetName="Border" Property="BorderBrush" Value="#FF007ACC"/>
+                                                </Trigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Border" Property="Background" Value="#FFEAEAEA"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </TabControl.Resources>
+
+                        <TabControl.Template>
+                            <ControlTemplate TargetType="TabControl">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <!-- UniformGrid for equal-width tabs -->
+                                    <UniformGrid Rows="1" Grid.Row="0" IsItemsHost="True"/>
+
+                                    <ContentPresenter Grid.Row="1"
+                                  ContentSource="SelectedContent"/>
+                                </Grid>
+                            </ControlTemplate>
+                        </TabControl.Template>
                         <TabItem>
                             <TabItem.Header>
                                 <Button x:Name="ChatTabButton" Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="ChatTabButton_Click" Style="{StaticResource WindowButtonStyle}">
@@ -664,7 +709,24 @@
                                         <Setter Property="Template">
                                             <Setter.Value>
                                                 <ControlTemplate TargetType="ListBoxItem">
-                                                    <ContentPresenter/>
+                                                    <Border x:Name="Border"
+                                                            Background="Transparent"
+                                                            BorderBrush="Transparent"
+                                                            BorderThickness="0"
+                                                            Padding="8"
+                                                            CornerRadius="12">
+                                                        <ContentPresenter />
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsSelected" Value="True">
+                                                            <Setter TargetName="Border" Property="Background" Value="#D0E2FF"/>
+                                                            <!-- Màu nền đậm hơn -->
+                                                        </Trigger>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="Border" Property="Background" Value="#E6F0FF"/>
+                                                            <!-- Hover nhẹ -->
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
                                                 </ControlTemplate>
                                             </Setter.Value>
                                         </Setter>
@@ -999,9 +1061,10 @@
                                     <!-- Danh sách bạn bè -->
                                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                     <ListBox x:Name="GroupUserListBox"
-                                                 Style="{StaticResource RoundedListBoxStyle}"
-                                                 HorizontalContentAlignment="Stretch"
-                                                 SelectionMode="Multiple">
+                                             
+                                             Style="{StaticResource RoundedListBoxStyle}"
+                                             HorizontalContentAlignment="Stretch"
+                                             SelectionMode="Multiple">
 
                                         <ListBox.ItemContainerStyle>
                                                 <Style TargetType="ListBoxItem" BasedOn="{StaticResource UserListItemAnimatedStyle}" >
@@ -1025,27 +1088,55 @@
                                         <ListBox.ItemTemplate>
                                             <DataTemplate>
                                                 <Border Background="White" BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="12" Padding="10" Margin="5" SnapsToDevicePixels="True" HorizontalAlignment="Stretch">
-                                                    <Border.Effect>
-                                                        <DropShadowEffect BlurRadius="10" ShadowDepth="2" Color="Gray" Opacity="0.2"/>
-                                                    </Border.Effect>
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                        </Grid.ColumnDefinitions>
+                                                        <Border.Effect>
+                                                            <DropShadowEffect BlurRadius="10" ShadowDepth="2" Color="Gray" Opacity="0.2"/>
+                                                        </Border.Effect>
+                                                        <Border.RenderTransform>
+                                                            <ScaleTransform ScaleX="1" ScaleY="1"/>
+                                                        </Border.RenderTransform>
+                                                        <Border.RenderTransformOrigin>0.5,0.5</Border.RenderTransformOrigin>
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Style.Triggers>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Trigger.EnterActions>
+                                                                            <BeginStoryboard>
+                                                                                <Storyboard>
+                                                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.05" Duration="0:0:0.15"/>
+                                                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.05" Duration="0:0:0.15"/>
+                                                                                </Storyboard>
+                                                                            </BeginStoryboard>
+                                                                        </Trigger.EnterActions>
+                                                                        <Trigger.ExitActions>
+                                                                            <BeginStoryboard>
+                                                                                <Storyboard>
+                                                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1" Duration="0:0:0.15"/>
+                                                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1" Duration="0:0:0.15"/>
+                                                                                </Storyboard>
+                                                                            </BeginStoryboard>
+                                                                        </Trigger.ExitActions>
+                                                                    </Trigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                            </Grid.ColumnDefinitions>
 
-                                                        <CheckBox Grid.Column="0" VerticalAlignment="Center" Margin="5" IsChecked="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                                                            <CheckBox Grid.Column="0" VerticalAlignment="Center" Margin="5" IsChecked="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
 
-                                                        <Border Width="50" Height="50" CornerRadius="25" ClipToBounds="True" Grid.Column="1">
-                                                            <Image Source="{Binding Avatar, Converter={StaticResource ImageUrlConverter}, FallbackValue='Icons/user.png'}"
-                                                                   Width="50" Height="50" Stretch="UniformToFill"/>
-                                                        </Border>
+                                                            <Border Width="50" Height="50" CornerRadius="25" ClipToBounds="True" Grid.Column="1">
+                                                                <Image Source="{Binding Avatar, Converter={StaticResource ImageUrlConverter}, FallbackValue='Icons/user.png'}"
+                                                                       Width="50" Height="50" Stretch="UniformToFill"/>
+                                                            </Border>
 
-                                                        <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="10,0,0,0">
-                                                            <TextBlock Text="{Binding DisplayName}" FontSize="16" FontWeight="SemiBold" Foreground="#333"/>
-                                                        </StackPanel>
-                                                    </Grid>
+                                                            <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="10,0,0,0">
+                                                                <TextBlock Text="{Binding DisplayName}" FontSize="16" FontWeight="SemiBold" Foreground="#333"/>
+                                                            </StackPanel>
+                                                        </Grid>
                                                 </Border>
                                             </DataTemplate>
                                         </ListBox.ItemTemplate>
@@ -1111,7 +1202,7 @@
               ResizeDirection="Columns" Margin="0,10,0,0"/>
 
             <!-- Cột khu vực chat -->
-            <Border Grid.Row="1" Grid.Column="1" Background="#ECF0F1" CornerRadius="0,20,20,0" Margin="10,10,0,10">
+            <Border Grid.Row="1" Grid.Column="1" Background="#b0c4de" CornerRadius="20,20,20,20" Margin="5,10,0,10">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -1241,19 +1332,19 @@
                             </Button>
                         </StackPanel>
                         <TextBox x:Name="MessageTextBox"
-         Grid.Column="1"
-         AcceptsReturn="False"
-         TextWrapping="Wrap"
-         KeyDown="MessageTextBox_KeyDown"
-         TextChanged="MessageTextBox_TextChanged"
-         Style="{StaticResource MessageTextBoxStyle}"/>
+                                 Grid.Column="1"
+                                 AcceptsReturn="False"
+                                 TextWrapping="Wrap"
+                                 KeyDown="MessageTextBox_KeyDown"
+                                 TextChanged="MessageTextBox_TextChanged"
+                                 Style="{StaticResource MessageTextBoxStyle}"/>
 
                         <TextBlock x:Name="TypingStatusTextBlock"
-                           Text=""
-                           Visibility="Collapsed"
-                           Foreground="Gray"
-                           FontStyle="Italic"
-                           Margin="10,0,10,10"/>
+                                   Text=""
+                                   Visibility="Collapsed"
+                                   Foreground="Gray"
+                                   FontStyle="Italic"
+                                   Margin="10,0,10,10"/>
 
                         <UniformGrid Grid.Column="2" Columns="2" HorizontalAlignment="Right" VerticalAlignment="Center">
                             <!-- Nút Like -->
@@ -1293,7 +1384,6 @@
                                 <Image Source="Icons/send.png" Width="20" Height="20"/>
                             </Button>
                         </UniformGrid>
-
                     </Grid>
                 </Grid>
             </Border>
@@ -1310,10 +1400,10 @@
                     Grid.Row="1"
                     Grid.Column="2"
                     Background="CadetBlue"
-                    CornerRadius="0,0,30,0"
-                    Margin="10"
+                    CornerRadius="20"
+                    Margin="5"
                     Opacity="0"
-                    Visibility="Collapsed"> 
+                    Visibility="Visible"> 
                 <Border.Triggers>
                     <EventTrigger RoutedEvent="Border.Loaded">
                         <BeginStoryboard>
@@ -1336,6 +1426,7 @@
                     
                 </ScrollViewer>
             </Border>
+            
             <Border x:Name="GroupProfilePanel" Visibility="Collapsed" Grid.Column="2" Grid.Row="1" Background="{StaticResource SecondaryColor}" Margin="10" CornerRadius="20">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="15">
@@ -1395,18 +1486,18 @@
                             </ListBox>
 
                             <Button Content="Duyệt thành viên đã chọn"
-                            Margin="10,0,0,10"
-                            Width="200"
-                            Height="30"
-                            Click="ApproveSelectedPendingMembers_Click"
-                            Visibility="Collapsed"
-                            x:Name="ApproveSelectedButton"/>
+                                    Margin="10,0,0,10"
+                                    Width="200"
+                                    Height="30"
+                                    Click="ApproveSelectedPendingMembers_Click"
+                                    Visibility="Collapsed"
+                                    x:Name="ApproveSelectedButton"/>
 
                             <Button x:Name="RejectSelectedButton"
-                            Content="Reject Selected"
-                            Click="RejectSelectedPendingMembers_Click"
-                            Visibility="Collapsed"
-                            Margin="5"/>
+                                    Content="Reject Selected"
+                                    Click="RejectSelectedPendingMembers_Click"
+                                    Visibility="Collapsed"
+                                    Margin="5"/>
 
 
                             <Button x:Name="InviteMemberButton" Content="➕ Invite Member" Margin="0,5" Height="35" Click="InviteMemberButton_Click" Style="{StaticResource WindowButtonStyle}"/>
@@ -1426,12 +1517,12 @@
                             </ListBox>
 
                             <Button Content="Mời"
-                                Margin="10,0,0,10"
-                                Width="200"
-                                Height="30"
-                                Click="ConfirmInvite_Click"
-                                Visibility="Collapsed"
-                                x:Name="ConfirmInviteButton"/>      
+                                    Margin="10,0,0,10"
+                                    Width="200"
+                                    Height="30"
+                                    Click="ConfirmInvite_Click"
+                                    Visibility="Collapsed"
+                                    x:Name="ConfirmInviteButton"/>
 
                             <Button x:Name="LeaveGroupButton" Content="🚪 Leave Group" Margin="0,5" Height="35" 
                                     Click="LeaveGroupButton_Click" Style="{StaticResource WindowButtonStyle}" 
@@ -1440,8 +1531,6 @@
                     </StackPanel>
                 </ScrollViewer>
             </Border>
-
-
         </Grid>
     </Border>
 </Window>

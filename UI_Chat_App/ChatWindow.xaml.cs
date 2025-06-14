@@ -1663,8 +1663,8 @@ namespace UI_Chat_App
             {
                 var openFileDialog = new Microsoft.Win32.OpenFileDialog
                 {
-                    Filter = "Image files (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg",
-                    Title = "Chọn ảnh để gửi"
+                    Filter = "Image files (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg|All files (*.*)|*.*",
+                    Title = "Select an image to send"
                 };
 
                 if (openFileDialog.ShowDialog() == true)
@@ -1681,13 +1681,14 @@ namespace UI_Chat_App
                     var message = new MessageData
                     {
                         SenderId = App.CurrentUser.Id,
-                        ReceiverId = _selectedUser?.Id,
+                        ReceiverId = _selectedUser.Id,
                         Content = "Đã gửi một ảnh",
                         Timestamp = timestamp,
                         MessageType = "Image",
                         FileUrl = imageUrl
                     };
 
+                    AddMessageToUI(message);
                     await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
                     AttachOptionsPanel.Visibility = Visibility.Collapsed;
 
@@ -1717,7 +1718,7 @@ namespace UI_Chat_App
                 var openFileDialog = new Microsoft.Win32.OpenFileDialog
                 {
                     Filter = "All files (*.*)|*.*",
-                    Title = "Chọn file để gửi"
+                    Title = "Select a file to send"
                 };
 
                 if (openFileDialog.ShowDialog() == true)
@@ -1735,14 +1736,14 @@ namespace UI_Chat_App
                     var message = new MessageData
                     {
                         SenderId = App.CurrentUser.Id,
-                        ReceiverId = _selectedUser?.Id,
+                        ReceiverId = _selectedUser.Id,
                         Content = $"Đã gửi file: {fileName}",
                         Timestamp = timestamp,
                         MessageType = "File",
                         FileUrl = fileUrl,
                         FileName = fileName
                     };
-
+                    AddMessageToUI(message);
                     await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
                     AttachOptionsPanel.Visibility = Visibility.Collapsed;
 
@@ -1795,13 +1796,13 @@ namespace UI_Chat_App
                 var message = new MessageData
                 {
                     SenderId = App.CurrentUser.Id,
-                    ReceiverId = _selectedUser?.Id,
+                    ReceiverId = _selectedUser.Id,
                     Content = "Đã gửi một tin nhắn thoại",
                     Timestamp = timestamp,
                     MessageType = "Voice",
                     FileUrl = voiceUrl
                 };
-
+                AddMessageToUI(message);
                 await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
                 File.Delete(tempFilePath);
                 AttachOptionsPanel.Visibility = Visibility.Collapsed;
@@ -1842,7 +1843,7 @@ namespace UI_Chat_App
                     var message = new MessageData
                     {
                         SenderId = App.CurrentUser.Id,
-                        ReceiverId = _selectedUser?.Id,
+                        ReceiverId = _selectedUser.Id,
                         Content = emojiKey,
                         Timestamp = timestamp,
                         MessageType = "Emoji"
@@ -2540,10 +2541,6 @@ namespace UI_Chat_App
             if (UserListBox.ItemsSource != _chatrooms)
                 UserListBox.ItemsSource = _chatrooms;
         }
-
-
-
-
 
     }
 }

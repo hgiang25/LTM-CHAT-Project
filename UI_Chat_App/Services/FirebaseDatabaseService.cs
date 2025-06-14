@@ -1152,7 +1152,7 @@ namespace ChatApp.Services
             var groupsRef = _firestoreDb.Collection("groups");
 
             // Lắng nghe mọi thay đổi trong tập hợp nhóm
-            _userGroupsListener = groupsRef.Listen(async snapshot =>
+            _userGroupsListener = groupsRef.Listen(snapshot =>
             {
                 Console.WriteLine($"📥 Received group snapshot: {snapshot.Documents.Count} documents");
 
