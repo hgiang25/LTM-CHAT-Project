@@ -455,35 +455,22 @@ namespace ChatApp.Services
         {
             try
             {
-                // Tạo danh sách để lưu tất cả các lời mời đã gửi
-                var sentFriendRequests = new List<FriendRequest>();
+                if (string.IsNullOrEmpty(userId))
+                    throw new ArgumentException("UserId cannot be empty.");
 
-                // Lấy tất cả người dùng để kiểm tra các lời mời đã gửi
-                CollectionReference usersRef = _firestoreDb.Collection("users");
-                QuerySnapshot usersSnapshot = await usersRef.GetSnapshotAsync();
+                // Truy vấn subcollection sentFriendRequests của người dùng
+                CollectionReference sentRequestsRef = _firestoreDb
+                    .Collection("users").Document(userId)
+                    .Collection("sentFriendRequests");
+                QuerySnapshot snapshot = await sentRequestsRef
+                    .WhereEqualTo("Status", "pending")
+                    .GetSnapshotAsync();
 
-                // Duyệt qua từng người dùng để kiểm tra xem userId có gửi lời mời cho họ không
-                foreach (var userDoc in usersSnapshot.Documents)
-                {
-                    if (userDoc.Id == userId) continue; // Bỏ qua chính người dùng hiện tại
+                var sentFriendRequests = snapshot.Documents
+                    .Select(doc => doc.ConvertTo<FriendRequest>())
+                    .ToList();
 
-                    CollectionReference requestsRef = _firestoreDb
-                        .Collection("users").Document(userDoc.Id)
-                        .Collection("friendRequests");
-                    QuerySnapshot snapshot = await requestsRef
-                        .WhereEqualTo("FromUserId", userId)
-                        .WhereEqualTo("Status", "pending")
-                        .GetSnapshotAsync();
-
-                    var requests = snapshot.Documents
-                        .Where(doc => doc.Exists)
-                        .Select(doc => doc.ConvertTo<FriendRequest>())
-                        .ToList();
-
-                    sentFriendRequests.AddRange(requests);
-                }
-
-                // Lấy thông tin người nhận cho mỗi request
+                // Lấy thông tin người nhận
                 var friendRequestsWithInfo = new List<FriendRequestWithUserInfo>();
                 foreach (var request in sentFriendRequests)
                 {
@@ -493,7 +480,7 @@ namespace ChatApp.Services
                         friendRequestsWithInfo.Add(new FriendRequestWithUserInfo
                         {
                             FriendRequest = request,
-                            Sender = receiver // Ở đây Sender là người nhận lời mời
+                            Sender = receiver
                         });
                     }
                 }
@@ -503,6 +490,7 @@ namespace ChatApp.Services
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"Failed to get sent friend requests for user {userId}: {ex.Message}");
                 throw new Exception($"Failed to get sent friend requests: {ex.Message}", ex);
             }
         }
