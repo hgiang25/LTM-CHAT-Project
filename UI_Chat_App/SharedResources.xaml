@@ -174,4 +174,32 @@
               ShadowDepth="0" 
               BlurRadius="20" 
               Opacity="0.25"/>
+    <Style x:Key="MaterialDesignCircularProgressBar" TargetType="ProgressBar">
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Grid>
+                        <Ellipse Stroke="{TemplateBinding Background}" 
+                             StrokeThickness="2" 
+                             Width="{TemplateBinding Width}" 
+                             Height="{TemplateBinding Height}"/>
+                        <Ellipse x:Name="PART_Indicator"
+                             Stroke="{TemplateBinding Foreground}" 
+                             StrokeThickness="3" 
+                             StrokeStartLineCap="Round"
+                             StrokeEndLineCap="Round"
+                             Width="{TemplateBinding Width}" 
+                             Height="{TemplateBinding Height}">
+                            <Ellipse.RenderTransform>
+                                <RotateTransform Angle="-90" CenterX="10" CenterY="10"/>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 </ResourceDictionary>

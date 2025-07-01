@@ -43,71 +43,89 @@
                     <TextBlock Text="Welcome Back!" FontSize="26" FontWeight="Bold" Foreground="#2C3E50" HorizontalAlignment="Center" Margin="0,0,0,30"/>
 
                     <!-- Username with icon -->
-                    <StackPanel Margin="0,0,0,15">
-                        <TextBlock Text="Email" Margin="5,0,0,3" Foreground="Gray" FontSize="13"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="30"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Image Source="Icons/user_login.png" Width="16" Height="16" Margin="7,0" VerticalAlignment="Center" Grid.Column="0"/>
-                            <TextBox x:Name="UsernameTextBox" Grid.Column="1" Height="40" FontSize="14" Style="{StaticResource RoundedTextBoxStyle}" GotFocus="TextBox_GotFocus" LostFocus="TextBox_LostFocus"/>
-                        </Grid>
-                        <TextBlock x:Name="UsernamePlaceholder" Text="" Visibility="Collapsed"/>
-                    </StackPanel>
+                        <StackPanel Margin="0,0,0,15">
+                            <TextBlock Text="Email" Margin="5,0,0,3" Foreground="Gray" FontSize="13"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="30"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Image Source="Icons/user_login.png" Width="16" Height="16" Margin="7,0" VerticalAlignment="Center" Grid.Column="0"/>
+                                <TextBox x:Name="UsernameTextBox" Tag="Your email..." Grid.Column="1" Height="40" FontSize="14" Style="{StaticResource RoundedTextBoxStyle}" GotFocus="TextBox_GotFocus" LostFocus="TextBox_LostFocus"/>
 
-                    <!-- Password with lock icon (left) and toggle icon in box (right) -->
-                    <StackPanel Margin="0,0,0,15">
-                        <TextBlock Text="Password" Margin="5,0,0,3" Foreground="Gray" FontSize="13"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="30"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="40"/>
-                            </Grid.ColumnDefinitions>
-
-                            <!-- Lock icon (left) -->
-                            <Image Source="Icons/lock.png" Width="16" Height="16" Margin="7,0" VerticalAlignment="Center" Grid.Column="0"/>
-
-                            <!-- Password and visible textbox overlay -->
-                            <Grid Grid.Column="1">
-                                <PasswordBox x:Name="PasswordBox" Height="40" FontSize="14"
-                                             Style="{StaticResource RoundedPasswordBoxStyle}"
-                                             GotFocus="PasswordBox_GotFocus"
-                                             LostFocus="PasswordBox_LostFocus"
-                                             PasswordChanged="PasswordBox_PasswordChanged"
-                                             Padding="5,0"
-                                             Visibility="Visible"/>
-
-                                <TextBox x:Name="VisiblePasswordBox"
-                                 Visibility="Collapsed"
-                                 IsReadOnly="False"
-                                 Focusable="True"
-                                 AcceptsReturn="False"
-                                 VerticalContentAlignment="Center"
-                                 FontSize="16"
-                                 Margin="0"
-                                 Padding="5"
-                                 TextChanged="VisiblePasswordBox_TextChanged"/>
-
-
+                                <!-- Thêm placeholder cho username -->
+                                <TextBlock x:Name="UsernamePlaceholder" 
+                   Grid.Column="1" 
+                   Margin="10,0,0,0" 
+                   VerticalAlignment="Center" 
+                   Foreground="LightGray" 
+                   IsHitTestVisible="False"/>
                             </Grid>
+                        </StackPanel>
 
-                            <!-- Toggle icon inside square box (right) -->
-                            <Border Grid.Column="2" Background="White" BorderBrush="#ccc" BorderThickness="1" CornerRadius="10" Margin="5,0,0,0" HorizontalAlignment="Right" Width="35" Height="40">
-                                <Image x:Name="PasswordToggleIcon"
-                                       Source="Icons/hide.png"
-                                       Width="16" Height="16"
-                                       VerticalAlignment="Center"
-                                       HorizontalAlignment="Center"
-                                       Cursor="Hand"
-                                       MouseLeftButtonUp="TogglePasswordVisibility"/>
-                            </Border>
-                        </Grid>
-                        <TextBlock x:Name="PasswordPlaceholder" Text="" Visibility="Collapsed"/>
-                    </StackPanel>
+                        <!-- Password with lock icon (left) and toggle icon in box (right) -->
+                        <StackPanel Margin="0,0,0,15">
+                            <TextBlock Text="Password" Margin="5,0,0,3" Foreground="Gray" FontSize="13"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="30"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="40"/>
+                                </Grid.ColumnDefinitions>
 
-                    <TextBlock x:Name="ErrorMessageTextBlock" Foreground="Red" Visibility="Collapsed" Margin="5,0,0,10" FontSize="12"/>
+                                <!-- Lock icon (left) -->
+                                <Image Source="Icons/lock.png" Width="16" Height="16" Margin="7,0" VerticalAlignment="Center" Grid.Column="0"/>
+
+                                <!-- Password and visible textbox overlay -->
+                                <Grid Grid.Column="1">
+                                    <PasswordBox x:Name="PasswordBox" 
+                         KeyDown="Input_KeyDown" Height="40" FontSize="14"
+                         Style="{StaticResource RoundedPasswordBoxStyle}"
+                         GotFocus="PasswordBox_GotFocus"
+                         LostFocus="PasswordBox_LostFocus"
+                         PasswordChanged="PasswordBox_PasswordChanged"
+                         Padding="5,0"
+                         Tag="Your password..."
+                         Visibility="Visible"/>
+
+                                    <TextBox x:Name="VisiblePasswordBox"
+                     KeyDown="Input_KeyDown"
+                     Style="{StaticResource RoundedTextBoxStyle}"
+                     Visibility="Collapsed"
+                     IsReadOnly="False"
+                     Focusable="True"
+                     AcceptsReturn="False"
+                     VerticalContentAlignment="Center"
+                     FontSize="16"
+                     Margin="0"
+                     Padding="5"
+                     Tag="Your password..."
+                     TextChanged="VisiblePasswordBox_TextChanged"
+                     GotFocus="VisiblePasswordBox_GotFocus"
+                     LostFocus="VisiblePasswordBox_LostFocus"/>
+
+                                    <!-- Thêm placeholder cho password -->
+                                    <TextBlock x:Name="PasswordPlaceholder" 
+                       Margin="10,0,0,0" 
+                       VerticalAlignment="Center" 
+                       Foreground="LightGray" 
+                       IsHitTestVisible="False"/>
+                                </Grid>
+
+                                <!-- Toggle icon inside square box (right) -->
+                                <Border Grid.Column="2" Background="White" BorderBrush="#ccc" BorderThickness="1" CornerRadius="10" Margin="5,0,0,0" HorizontalAlignment="Right" Width="35" Height="40">
+                                    <Image x:Name="PasswordToggleIcon"
+                   Source="Icons/hide.png"
+                   Width="16" Height="16"
+                   VerticalAlignment="Center"
+                   HorizontalAlignment="Center"
+                   Cursor="Hand"
+                   MouseLeftButtonUp="TogglePasswordVisibility"/>
+                                </Border>
+                            </Grid>
+                        </StackPanel>
+
+                        <TextBlock x:Name="ErrorMessageTextBlock" Foreground="Red" Visibility="Collapsed" Margin="5,0,0,10" FontSize="12"/>
 
                     <Button Height="45" Content="Login" Click="LoginButton_Click" Style="{StaticResource RoundedButtonStyle}"/>
 
@@ -118,6 +136,30 @@
                     <TextBlock Text="Don't have an account? Sign Up" Foreground="#3498DB" Margin="0,5,0,0" FontSize="13" HorizontalAlignment="Center" Cursor="Hand"
                                MouseLeftButtonUp="SignUpTextBlock_MouseLeftButtonUp"
                                MouseEnter="TextBlock_MouseEnter" MouseLeave="TextBlock_MouseLeave"/>
+                </StackPanel>
+            </Border>
+            <!-- Thêm vào Grid chính, cùng cấp với các thành phần khác -->
+            <!-- Thêm vào Grid chính, cùng cấp với các thành phần khác -->
+            <Border x:Name="LoadingBorder"
+        CornerRadius="10"
+        Background="Black"
+        HorizontalAlignment="Right"
+        VerticalAlignment="Bottom"
+        Margin="20"
+        Visibility="Collapsed"
+        Padding="15,10"
+        Opacity="0.9">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <ProgressBar IsIndeterminate="True" 
+                     Width="20" 
+                     Height="20" 
+                     Margin="0,0,10,0"
+                     Style="{StaticResource MaterialDesignCircularProgressBar}"/>
+                    <TextBlock Text="Loading..." 
+                   Foreground="White"
+                   FontSize="16"
+                   FontWeight="SemiBold"
+                   VerticalAlignment="Center"/>
                 </StackPanel>
             </Border>
         </Grid>

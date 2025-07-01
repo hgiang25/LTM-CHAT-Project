@@ -18,6 +18,7 @@ namespace UI_Chat_App
         {
 
             InitializeComponent();
+            InitializePlaceholders();
             this.Opacity = 0;
             this.Loaded += (s, e) =>
             {
@@ -36,7 +37,17 @@ namespace UI_Chat_App
 
             _authService = new FirebaseAuthService();
         }
+        private void InitializePlaceholders()
+        {
+            UsernamePlaceholder.Text = UsernameTextBox.Tag.ToString();
+            PasswordPlaceholder.Text = PasswordBox.Tag.ToString();
 
+            UsernamePlaceholder.Visibility = string.IsNullOrEmpty(UsernameTextBox.Text)
+                ? Visibility.Visible : Visibility.Collapsed;
+
+            PasswordPlaceholder.Visibility = string.IsNullOrEmpty(PasswordBox.Password)
+                ? Visibility.Visible : Visibility.Collapsed;
+        }
         // Dùng để di chuyển cửa sổ khi kéo chuột
         private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
@@ -73,46 +84,31 @@ namespace UI_Chat_App
             TextBox textBox = sender as TextBox;
             if (textBox != null)
             {
-                if (textBox.Name == "UsernameTextBox" && textBox.Text == "")
-                {
-                    UsernamePlaceholder.Visibility = Visibility.Collapsed;
-                }
+                UsernamePlaceholder.Visibility = Visibility.Collapsed;
             }
         }
 
         private void TextBox_LostFocus(object sender, RoutedEventArgs e)
         {
             TextBox textBox = sender as TextBox;
-            if (textBox != null)
+            if (textBox != null && string.IsNullOrEmpty(textBox.Text))
             {
-                if (textBox.Name == "UsernameTextBox" && textBox.Text == "")
-                {
-                    UsernamePlaceholder.Visibility = Visibility.Visible;
-                }
+                UsernamePlaceholder.Visibility = Visibility.Visible;
             }
         }
 
         private void PasswordBox_GotFocus(object sender, RoutedEventArgs e)
         {
             PasswordBox passwordBox = sender as PasswordBox;
-            if (passwordBox != null && passwordBox.Password == "")
-            {
-                if (passwordBox.Name == "PasswordBox")
-                {
-                    PasswordPlaceholder.Visibility = Visibility.Collapsed;
-                }
-            }
+            PasswordPlaceholder.Visibility = Visibility.Collapsed;
         }
 
         private void PasswordBox_LostFocus(object sender, RoutedEventArgs e)
         {
             PasswordBox passwordBox = sender as PasswordBox;
-            if (passwordBox != null && passwordBox.Password == "")
+            if (passwordBox != null && string.IsNullOrEmpty(passwordBox.Password))
             {
-                if (passwordBox.Name == "PasswordBox")
-                {
-                    PasswordPlaceholder.Visibility = Visibility.Visible;
-                }
+                PasswordPlaceholder.Visibility = Visibility.Visible;
             }
         }
 
@@ -149,6 +145,7 @@ namespace UI_Chat_App
 
         private async void LoginButton_Click(object sender, RoutedEventArgs e)
         {
+
             string email = UsernameTextBox.Text;
             string password = PasswordBox.Password;
 
@@ -158,7 +155,7 @@ namespace UI_Chat_App
                 ErrorMessageTextBlock.Visibility = Visibility.Visible;
                 return;
             }
-
+            LoadingBorder.Visibility = Visibility.Visible;
             try
             {
                 var (idToken, refreshToken, uid) = await _authService.SignInWithEmailAndPasswordAsync(email, password);
@@ -209,6 +206,7 @@ namespace UI_Chat_App
             }
             catch (Exception ex)
             {
+                LoadingBorder.Visibility = Visibility.Collapsed;
                 ErrorMessageTextBlock.Text = ex.Message;
                 ErrorMessageTextBlock.Visibility = Visibility.Visible;
             }
@@ -260,6 +258,27 @@ namespace UI_Chat_App
             }
         }
 
+        private void Input_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                LoginButton_Click(sender, e);
+            }
+        }
+
+        // Thêm xử lý cho VisiblePasswordBox
+        private void VisiblePasswordBox_GotFocus(object sender, RoutedEventArgs e)
+        {
+            PasswordPlaceholder.Visibility = Visibility.Collapsed;
+        }
+
+        private void VisiblePasswordBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(VisiblePasswordBox.Text))
+            {
+                PasswordPlaceholder.Visibility = Visibility.Visible;
+            }
+        }
         private void VisiblePasswordBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (isPasswordVisible)

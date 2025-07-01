@@ -166,6 +166,10 @@ namespace UI_Chat_App
                 await RefreshFriendsAndRequestsAsync();                
                 await LoadAllUsersAsync();
                 //StartListeningToUserGroups();
+                // Hiển thị thông báo welcome khi khởi tạo
+                await Dispatcher.InvokeAsync(() => {
+                    WelcomeMessageText.Visibility = Visibility.Visible;
+                });
             }
             catch (Exception ex)
             {
@@ -490,6 +494,8 @@ namespace UI_Chat_App
         {
             try
             {
+                WelcomeMessageText.Visibility = Visibility.Collapsed;
+
                 if (_messages.Any(m => m.MessageId == message.MessageId))
                     return;
 
@@ -947,6 +953,8 @@ namespace UI_Chat_App
 
         private async void UserListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            WelcomeMessageText.Visibility = Visibility.Collapsed;
+
             var selectedItem = UserListBox.SelectedItem;
 
             if (selectedItem is UserData newSelectedUser)
@@ -1059,7 +1067,8 @@ namespace UI_Chat_App
             // Ẩn cả hai profile panel
             UserProfilePanel.Visibility = Visibility.Collapsed;
             GroupProfilePanel.Visibility = Visibility.Collapsed;
-
+            // Hiển thị lại thông báo welcome khi reset
+            WelcomeMessageText.Visibility = Visibility.Visible;
         }
 
 
@@ -1670,10 +1679,50 @@ namespace UI_Chat_App
             TabControl.SelectedIndex = 0;
         }
 
+        private void CurrentUserInfo_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            // Chỉ xử lý nếu click vào phần tên, không phải nút logout
+            if (e.OriginalSource is TextBlock || e.OriginalSource is Image)
+            {
+                ShowCurrentUserProfile();
+            }
+        }
+
+        private void ShowCurrentUserProfile()
+        {
+            // Ẩn các panel khác
+            GroupProfilePanel.Visibility = Visibility.Collapsed;
+            UserProfilePanel.Visibility = Visibility.Visible;
+
+            // Đảm bảo cột profile được mở rộng
+            UserProfileColumn.Width = new GridLength(230);
+
+            // Cập nhật thông tin profile
+            ProfileAvatar.Source = LoadAvatar(App.CurrentUser.Avatar);
+            ProfileUsername.Text = $"Username: {App.CurrentUser.DisplayName}";
+            ProfileEmail.Text = $"Email: {App.CurrentUser.Email}";
+            ProfileStatus.Text = $"Status: {(App.CurrentUser.IsOnline ? "Online" : "Offline")}";
+
+            // Đặt lại lựa chọn trong danh sách chat
+            UserListBox.SelectedItem = null;
+            _selectedUser = null;
+            _selectedGroup = null;
+        }
+
         private bool _isUserProfileVisible = false;
 
         private async void Optional_Click(object sender, RoutedEventArgs e)
         {
+            // Nếu đang hiển thị profile của chính mình, thì đóng nó
+            if (UserProfilePanel.Visibility == Visibility.Visible &&
+                ProfileUsername.Text.Contains(App.CurrentUser.DisplayName))
+            {
+                UserProfilePanel.Visibility = Visibility.Collapsed;
+                UserProfileColumn.Width = new GridLength(0);
+                _isUserProfileVisible = false;
+                return;
+            }
+
             if (!_isUserProfileVisible)
             {
                 // Hiện lên
@@ -2602,6 +2651,7 @@ namespace UI_Chat_App
             if (UserListBox.ItemsSource != _chatrooms)
                 UserListBox.ItemsSource = _chatrooms;
         }
+
 
     }
 }
