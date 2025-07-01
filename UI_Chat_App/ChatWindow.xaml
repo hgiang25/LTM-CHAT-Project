@@ -416,10 +416,10 @@
                         </Button>-->
 
                         <Popup x:Name="DeletePopup"
-                       Placement="Top"
-                       PlacementTarget="{Binding ElementName=MoreOptionsButton}"
-                       StaysOpen="False"
-                       AllowsTransparency="True">
+                               Placement="Top"
+                               PlacementTarget="{Binding ElementName=MoreOptionsButton}"
+                               StaysOpen="False"
+                               AllowsTransparency="True">
                             <Border Background="White" CornerRadius="8" Padding="5" BorderBrush="LightGray" BorderThickness="1">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <!--<Button Width="30" Height="30"
