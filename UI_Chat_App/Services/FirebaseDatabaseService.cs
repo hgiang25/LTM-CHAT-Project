@@ -538,7 +538,7 @@ namespace ChatApp.Services
                         var notification = doc.ConvertTo<NotificationData>();
                         notification.Id = doc.Id;
                         return notification;
-                    })                    
+                    })
                     .ToList();
 
                 Console.WriteLine($"Loaded {notifications.Count} notifications for user {userId}");
@@ -595,7 +595,7 @@ namespace ChatApp.Services
                 throw new Exception($"Notification with ID {notificationId} not found in user notice {currUserId}");
             }
             await notificationRef.UpdateAsync("IsRead", true);
-            Console.WriteLine($"Marked notification {notificationId} as seen in notification room {currUserId}");                        
+            Console.WriteLine($"Marked notification {notificationId} as seen in notification room {currUserId}");
         }
         public async Task<int> CountUnreadNotificationsAsync(string userId)
         {
@@ -696,7 +696,7 @@ namespace ChatApp.Services
             });
         }
 
-        private FirestoreChangeListener _messageListener;       
+        private FirestoreChangeListener _messageListener;
 
         public async Task StartListeningToMessagesAsync(string chatRoomId, Action<MessageData> onMessageReceived)
         {
@@ -1140,7 +1140,7 @@ namespace ChatApp.Services
             var groupsRef = _firestoreDb.Collection("groups");
 
             // Lắng nghe mọi thay đổi trong tập hợp nhóm
-            _userGroupsListener = groupsRef.Listen(async snapshot =>
+            _userGroupsListener = groupsRef.Listen(snapshot =>
             {
                 Console.WriteLine($"📥 Received group snapshot: {snapshot.Documents.Count} documents");
 
@@ -1192,8 +1192,158 @@ namespace ChatApp.Services
             await SaveMessageAsync(chatRoomId, message, ""); // Truyền rỗng vì không cần idToken
         }
 
+
+
+
+        //private FirestoreChangeListener _groupMessageListener;
+
+        //public void ListenToGroupMessages(string groupId, Action<MessageData> onMessageReceived)
+        //{
+        //    var messagesRef = _firestoreDb
+        //        .Collection("groups")
+        //        .Document(groupId)
+        //        .Collection("messages")
+        //        .OrderBy("timestamp");
+
+        //    _groupMessageListener = messagesRef.Listen(snapshot =>
+        //    {
+        //        foreach (var change in snapshot.Changes)
+        //        {
+        //            if (change.ChangeType == Google.Cloud.Firestore.DocumentChange.Type.Added)
+        //            {
+        //                var message = change.Document.ConvertTo<MessageData>();
+        //                onMessageReceived?.Invoke(message); // Cập nhật UI
+        //            }
+        //        }
+        //    });
+        //}
+
+        //// Gọi khi rời nhóm hoặc đổi nhóm
+        //public void StopListeningToMessages()
+        //{
+        //    _groupMessageListener?.StopAsync();
+        //    _groupMessageListener = null;
+        //}
+
+
         public FirestoreDb GetDb() => _firestoreDb;
 
+        // =======================================================
+        // CÁC PHƯƠNG THỨC CHO TÍNH NĂNG GỌI ĐIỆN (AGORA)
+        // =======================================================
 
+        private FirestoreChangeListener _callListener;
+
+        public async Task InitiateCallAsync(CallData callData)
+        {
+            try
+            {
+                var callDoc = _firestoreDb.Collection("calls").Document(callData.ChannelName);
+                await callDoc.SetAsync(callData);
+                Console.WriteLine($"[Firebase] Cuộc gọi {callData.ChannelName} đã được khởi tạo thành công.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Firebase] LỖI khi khởi tạo cuộc gọi: {ex.Message}");
+                // Ném lại lỗi để nơi gọi (StartCallButton_Click) có thể bắt và thông báo cho người dùng
+                throw;
+            }
+        }
+
+        public async Task UpdateCallStatusAsync(string channelName, string status)
+        {
+            try
+            {
+                DocumentReference callRef = _firestoreDb.Collection("calls").Document(channelName);
+                await callRef.UpdateAsync("Status", status);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Could not update call status (might be normal if call ended): {ex.Message}");
+            }
+        }
+
+        public async Task EndCallAsync(string channelName)
+        {
+            try
+            {
+                // Xóa document cuộc gọi khi kết thúc để dọn dẹp
+                DocumentReference callRef = _firestoreDb.Collection("calls").Document(channelName);
+                await callRef.DeleteAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Could not delete call document (might be normal if call ended): {ex.Message}");
+            }
+        }
+
+        public void ListenForIncomingCall(string userId, Action<CallData> onIncomingCall)
+        {
+            var callRef = _firestoreDb.Collection("calls")
+                .WhereEqualTo("ReceiverId", userId)
+                .WhereEqualTo("Status", "calling");
+
+            _callListener = callRef.Listen(snapshot =>
+            {
+                foreach (var change in snapshot.Changes)
+                {
+                    if (change.Document.Exists)
+                    {
+                        var callData = change.Document.ConvertTo<CallData>();
+                        if (callData.Status == "calling")
+                        {
+                            onIncomingCall?.Invoke(callData);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Lắng nghe thay đổi của một cuộc gọi cụ thể (ví dụ: đối phương cúp máy)
+        public FirestoreChangeListener ListenForCallStatusChange(string channelName, Action<CallData> onStatusChanged)
+        {
+            DocumentReference callRef = _firestoreDb.Collection("calls").Document(channelName);
+            return callRef.Listen(snapshot =>
+            {
+                if (snapshot.Exists)
+                {
+                    var call = snapshot.ConvertTo<CallData>();
+                    onStatusChanged?.Invoke(call);
+                }
+                else
+                {
+                    // Document không còn tồn tại -> cuộc gọi đã kết thúc
+                    onStatusChanged?.Invoke(null);
+                }
+            });
+        }
+
+        public async Task<CallData> GetCallAsync(string channelName)
+        {
+            try
+            {
+                DocumentReference callRef = _firestoreDb.Collection("calls").Document(channelName);
+                DocumentSnapshot snapshot = await callRef.GetSnapshotAsync();
+                if (snapshot.Exists)
+                {
+                    return snapshot.ConvertTo<CallData>();
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to get call data: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task StopListeningForCalls()
+        {
+            if (_callListener != null)
+            {
+                await _callListener.StopAsync();
+                _callListener = null;
+            }
+        }
     }
 }
