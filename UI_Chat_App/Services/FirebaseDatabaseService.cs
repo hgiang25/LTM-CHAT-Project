@@ -1140,7 +1140,7 @@ namespace ChatApp.Services
             var groupsRef = _firestoreDb.Collection("groups");
 
             // Lắng nghe mọi thay đổi trong tập hợp nhóm
-            _userGroupsListener = groupsRef.Listen(snapshot =>
+            _userGroupsListener = groupsRef.Listen(async snapshot =>
             {
                 Console.WriteLine($"📥 Received group snapshot: {snapshot.Documents.Count} documents");
 
@@ -1191,40 +1191,6 @@ namespace ChatApp.Services
 
             await SaveMessageAsync(chatRoomId, message, ""); // Truyền rỗng vì không cần idToken
         }
-
-
-
-
-        //private FirestoreChangeListener _groupMessageListener;
-
-        //public void ListenToGroupMessages(string groupId, Action<MessageData> onMessageReceived)
-        //{
-        //    var messagesRef = _firestoreDb
-        //        .Collection("groups")
-        //        .Document(groupId)
-        //        .Collection("messages")
-        //        .OrderBy("timestamp");
-
-        //    _groupMessageListener = messagesRef.Listen(snapshot =>
-        //    {
-        //        foreach (var change in snapshot.Changes)
-        //        {
-        //            if (change.ChangeType == Google.Cloud.Firestore.DocumentChange.Type.Added)
-        //            {
-        //                var message = change.Document.ConvertTo<MessageData>();
-        //                onMessageReceived?.Invoke(message); // Cập nhật UI
-        //            }
-        //        }
-        //    });
-        //}
-
-        //// Gọi khi rời nhóm hoặc đổi nhóm
-        //public void StopListeningToMessages()
-        //{
-        //    _groupMessageListener?.StopAsync();
-        //    _groupMessageListener = null;
-        //}
-
 
         public FirestoreDb GetDb() => _firestoreDb;
 
