@@ -24,6 +24,7 @@ using System.Net;
 using System.Windows.Media.Animation;
 using Google.Cloud.Firestore.V1;
 using UI_Chat_App.Models;
+using System.ComponentModel.Design.Serialization;
 
 namespace UI_Chat_App
 {
@@ -532,9 +533,6 @@ namespace UI_Chat_App
         }
 
 
-
-
-
         private async Task AddMessageToUI(MessageData message)
         {
             try
@@ -545,8 +543,10 @@ namespace UI_Chat_App
                 var isMine = message.SenderId == App.CurrentUser.Id;
                 _messages.Add(message);
 
-                // StackPanel chứa nội dung message
-                var stack = new StackPanel();
+                bool isGroup = _selectedGroup != null;
+                bool isSystemMessage = message.MessageType == "System";
+
+                var stack = new StackPanel(); // chứa nội dung tin nhắn
 
                 switch (message.MessageType)
                 {
@@ -669,22 +669,79 @@ namespace UI_Chat_App
                             });
                         }
                         break;
-
-                    case "System":
-                        stack.Children.Add(new TextBlock
-                        {
-                            Text = message.Content,
-                            FontSize = 14,
-                            Foreground = Brushes.DarkSlateGray,
-                            FontStyle = FontStyles.Italic,
-                            TextAlignment = TextAlignment.Center,
-                            TextWrapping = TextWrapping.Wrap,
-                            Margin = new Thickness(10)
-                        });
-                        break;
                 }
 
-                // Thêm thời gian gửi
+                if (isSystemMessage)
+                {
+                    var systemText = new TextBlock
+                    {
+                        Text = message.Content,
+                        FontSize = 14,
+                        Foreground = Brushes.DarkSlateGray,
+                        FontStyle = FontStyles.Italic,
+                        TextAlignment = TextAlignment.Center,
+                        TextWrapping = TextWrapping.Wrap,
+                        Margin = new Thickness(10)
+                    };
+
+                    var systemBorder = new Border
+                    {
+                        Background = Brushes.Transparent,
+                        Padding = new Thickness(5),
+                        Margin = new Thickness(5),
+                        Child = systemText,
+                        HorizontalAlignment = HorizontalAlignment.Center
+                    };
+
+                    MessagesStackPanel.Children.Add(systemBorder);
+                    return;
+                }
+
+                // ==== Lấy thông tin người gửi ====
+                string senderAvatar = "Icons/user.png";
+                string senderName = "Unknown";
+
+                if (isGroup)
+                {
+                    var senderUser = _users.FirstOrDefault(u => u.Id == message.SenderId)
+                                  ?? _allUsers.FirstOrDefault(u => u.Id == message.SenderId);
+
+                    if (senderUser != null)
+                    {
+                        senderAvatar = senderUser.Avatar;
+                        senderName = senderUser.DisplayName;
+                    }
+                }
+                else
+                {
+                    senderAvatar = isMine ? App.CurrentUser.Avatar : _selectedUser?.Avatar;
+                    senderName = isMine ? App.CurrentUser.DisplayName : _selectedUser?.DisplayName;
+                }
+
+                // ==== Avatar ====
+                var avatarImage = new Image
+                {
+                    Width = 40,
+                    Height = 40,
+                    Margin = new Thickness(0, 0, 10, 0),
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Source = (ImageSource)new ImageUrlConverter().Convert(
+                        senderAvatar, typeof(ImageSource), null, null)
+                };
+
+                // ==== Hiển thị tên người gửi (nếu là nhóm) ====
+                if (isGroup && !isMine)
+                {
+                    stack.Children.Insert(0, new TextBlock
+                    {
+                        Text = senderName,
+                        FontWeight = FontWeights.Bold,
+                        Margin = new Thickness(0, 0, 0, 5),
+                        Foreground = Brushes.DarkSlateBlue
+                    });
+                }
+
+                // ==== Thời gian gửi + trạng thái ====
                 var time = message.Timestamp?.ToDateTime().ToLocalTime().ToShortTimeString() ?? "";
                 stack.Children.Add(new TextBlock
                 {
@@ -695,7 +752,6 @@ namespace UI_Chat_App
                     Margin = new Thickness(0, 5, 0, 0)
                 });
 
-                // Trạng thái Seen (nếu là tin nhắn của mình)
                 if (isMine && message.IsSeen)
                 {
                     stack.Children.Add(new TextBlock
@@ -707,16 +763,15 @@ namespace UI_Chat_App
                     });
                 }
 
-                // Bọc trong Border cho đẹp
-                var border = new Border
+                // ==== Border bọc nội dung ====
+                var messageBorder = new Border
                 {
                     Background = isMine ? Brushes.LightGreen : Brushes.White,
                     CornerRadius = new CornerRadius(10),
                     Padding = new Thickness(10),
                     Margin = new Thickness(5),
-                    MaxWidth = 300,
+                    MaxWidth = 400,
                     Child = stack,
-                    HorizontalAlignment = isMine ? HorizontalAlignment.Right : HorizontalAlignment.Left,
                     Effect = new System.Windows.Media.Effects.DropShadowEffect
                     {
                         BlurRadius = 5,
@@ -725,11 +780,27 @@ namespace UI_Chat_App
                     }
                 };
 
-                MessagesStackPanel.Children.Add(border);
+                // ==== StackPanel ngang: avatar + tin nhắn ====
+                var messageRow = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = isMine ? HorizontalAlignment.Right : HorizontalAlignment.Left
+                };
 
+                if (!isMine)
+                {
+                    messageRow.Children.Add(avatarImage);
+                    messageRow.Children.Add(messageBorder);
+                }
+                else
+                {
+                    messageRow.Children.Add(messageBorder);
+                }
+
+                // ==== Thêm vào UI ====
+                MessagesStackPanel.Children.Add(messageRow);
                 MessagesScrollViewer.ScrollToEnd();
 
-                // Cập nhật trạng thái seen nếu là người nhận
                 if (!message.IsSeen && message.ReceiverId == App.CurrentUser.Id)
                 {
                     message.IsSeen = true;
@@ -879,8 +950,41 @@ namespace UI_Chat_App
         }
 
 
+        private void DisplayName_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            // Ẩn group profile nếu đang hiển thị
+            GroupProfilePanel.Visibility = Visibility.Collapsed;
 
+            // Hiển thị user profile
+            UserProfilePanel.Visibility = Visibility.Visible;
+            UserProfileColumn.Width = new GridLength(230); // Hiển thị cột profile
 
+            // Cập nhật dữ liệu cho profile của user hiện tại
+            UpdateUserProfile(App.CurrentUser);
+        }
+
+        private void UpdateUserProfile(UserData user)
+        {
+            ProfileUsername.Text = $"Username: {user.DisplayName}";
+            ProfileEmail.Text = $"Email: {user.Email}";
+            ProfileStatus.Text = $"Status: {(user.IsOnline ? "Online" : "Offline")}";
+
+            // Load avatar - sử dụng converter đã có
+            var converter = new ImageUrlConverter();
+            ProfileAvatar.Source = (ImageSource)converter.Convert(
+                user.Avatar,
+                typeof(ImageSource),
+                null,
+                null
+            );
+
+            // Đặt lại trạng thái chat
+            _selectedUser = null;
+            _selectedGroup = null;
+            UserListBox.SelectedItem = null;
+            MessagesStackPanel.Children.Clear();
+            ChatWithTextBlock.Text = "Chat";
+        }
 
         private async Task LoadAllUsersAsync()
         {

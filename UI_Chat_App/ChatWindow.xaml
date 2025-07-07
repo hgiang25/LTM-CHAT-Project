@@ -510,7 +510,7 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition x:Name="UserProfileColumn" Width="0"/>
             </Grid.ColumnDefinitions>
-
+            
             <!-- Các nút điều khiển cửa sổ -->
             <StackPanel Grid.Row="0" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10">
                 <Button FontSize="30" Content="-" Width="30" Height="30" Click="MinimizeButton_Click" Style="{StaticResource WindowButtonStyle}"/>
@@ -527,6 +527,7 @@
                     <!-- Cột cho Tên người dùng -->
                     <ColumnDefinition Width="Auto"/>
                     <!-- Cột cho nút Logout -->
+                    
                 </Grid.ColumnDefinitions>
 
                 <!-- Avatar -->
@@ -538,7 +539,7 @@
 
                 <!-- Tên người dùng -->
                 <TextBlock x:Name="UsernameTextBlock" VerticalAlignment="Center" FontSize="16" FontWeight="Bold" Foreground="Black" 
-               TextTrimming="CharacterEllipsis" Margin="0,0,10,0" Grid.Column="1"/>
+               TextTrimming="CharacterEllipsis" Margin="0,0,10,0" Grid.Column="1" MouseLeftButtonUp="DisplayName_MouseLeftButtonUp"/>
 
                 <!-- Nút Logout -->
                 <Button Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="LogoutButton_Click" Style="{StaticResource WindowButtonStyle}" Grid.Column="2">
@@ -1422,9 +1423,9 @@
                     <StackPanel Margin="10">
                         <TextBlock Text="User Profile" FontSize="24" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
                         <Image x:Name="ProfileAvatar" Width="100" Height="100" Margin="0,10,0,10" Cursor="Hand"/>
-                        <TextBlock x:Name="ProfileUsername" Text="Username: [Username]" FontSize="16" Foreground="White" Margin="0,10,0,0"/>
-                        <TextBlock x:Name="ProfileEmail" Text="Email: user@example.com" FontSize="16" Foreground="White" Margin="0,10,0,0"/>
-                        <TextBlock x:Name="ProfileStatus" Text="Status: Online" FontSize="16" Foreground="White" Margin="0,10,0,0"/>
+                        <TextBlock x:Name="ProfileUsername" Text="{Binding CurrentUser.DisplayName}" FontSize="16" Foreground="White" Margin="0,10,0,0"/>
+                        <TextBlock x:Name="ProfileEmail" Text="{Binding CurrentUser.Email}" FontSize="16" Foreground="White" Margin="0,10,0,0"/>
+                        <TextBlock x:Name="ProfileStatus" Text="{Binding CurrentUser.IsOnline, Converter={StaticResource BooleanToOnlineStatusConverter}}" FontSize="16" Foreground="White" Margin="0,10,0,0"/>
                     </StackPanel>
 
                 </ScrollViewer>
