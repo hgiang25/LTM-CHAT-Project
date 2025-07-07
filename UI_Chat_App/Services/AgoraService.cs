@@ -119,45 +119,45 @@ namespace ChatApp.Services
 
                 // --- BƯỚC 1: KIỂM TRA THIẾT BỊ VIDEO ---
                 IVideoDeviceManager videoDeviceManager = _rtcEngine.GetVideoDeviceManager();
-                if (videoDeviceManager != null)
-                {
-                    IDeviceCollection videoDevices = videoDeviceManager.EnumerateVideoDevices();
-                    if (videoDevices != null)
-                    {
-                        videoCount = videoDevices.GetCount();
-                        videoDevices.Release();
-                    }
-                    else
-                    {
-                        Console.WriteLine("Failed to enumerate video devices.");
-                    }
-                    videoDeviceManager.Release();
-                }
-                else
-                {
-                    Console.WriteLine("VideoDeviceManager is null.");
-                }
+                //if (videoDeviceManager != null)
+                //{
+                //    IDeviceCollection videoDevices = videoDeviceManager.EnumerateVideoDevices();
+                //    if (videoDevices != null)
+                //    {
+                //        videoCount = videoDevices.GetCount();
+                //        videoDevices.Release();
+                //    }
+                //    else
+                //    {
+                //        Console.WriteLine("Failed to enumerate video devices.");
+                //    }
+                //    videoDeviceManager.Release();
+                //}
+                //else
+                //{
+                //    Console.WriteLine("VideoDeviceManager is null.");
+                //}
 
-                // --- BƯỚC 2: KIỂM TRA THIẾT BỊ AUDIO ---
-                IAudioDeviceManager audioDeviceManager = _rtcEngine.GetAudioDeviceManager();
-                if (audioDeviceManager != null)
-                {
-                    IDeviceCollection audioRecordingDevices = audioDeviceManager.EnumerateRecordingDevices();
-                    if (audioRecordingDevices != null)
-                    {
-                        audioCount = audioRecordingDevices.GetCount();
-                        audioRecordingDevices.Release();
-                    }
-                    else
-                    {
-                        Console.WriteLine("Failed to enumerate audio recording devices.");
-                    }
-                    audioDeviceManager.Release();
-                }
-                else
-                {
-                    Console.WriteLine("AudioDeviceManager is null.");
-                }
+                //// --- BƯỚC 2: KIỂM TRA THIẾT BỊ AUDIO ---
+                //IAudioDeviceManager audioDeviceManager = _rtcEngine.GetAudioDeviceManager();
+                //if (audioDeviceManager != null)
+                //{
+                //    IDeviceCollection audioRecordingDevices = audioDeviceManager.EnumerateRecordingDevices();
+                //    if (audioRecordingDevices != null)
+                //    {
+                //        audioCount = audioRecordingDevices.GetCount();
+                //        audioRecordingDevices.Release();
+                //    }
+                //    else
+                //    {
+                //        Console.WriteLine("Failed to enumerate audio recording devices.");
+                //    }
+                //    audioDeviceManager.Release();
+                //}
+                //else
+                //{
+                //    Console.WriteLine("AudioDeviceManager is null.");
+                //}
 
                 Console.WriteLine($"[Agora Service] Devices found: {videoCount} video, {audioCount} audio.");
                 return videoCount > 0 && audioCount > 0;

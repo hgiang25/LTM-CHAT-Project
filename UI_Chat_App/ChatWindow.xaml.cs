@@ -32,7 +32,7 @@ namespace UI_Chat_App
         private readonly FirebaseDatabaseService _databaseService;
         private readonly FirebaseAuthService _authService;
         private ObservableCollection<UserData> _users; // Danh sách bạn bè
-        private ObservableCollection<GroupData> _groups; // Danh sách bạn bè
+        private ObservableCollection<GroupData> _groups; // Danh sách nhóm
         private ObservableCollection<UserData> _allUsers; // Danh sách tất cả người dùng
         private ObservableCollection<FriendRequestWithUserInfo> _friendRequests; // Danh sách lời mời kết bạn
         private ObservableCollection<FriendRequestWithUserInfo> _sentFriendRequests; // Danh sách lời mời đã gửi
@@ -963,8 +963,9 @@ namespace UI_Chat_App
             }
             else if (selectedItem is GroupData selectedGroup)
             {
-                // --- Xử lý chat nhóm ---
-                _selectedGroup = selectedGroup;
+                // --- Xử lý chat nhóm ---                
+                _selectedGroup = await _databaseService.GetGroupAsync(selectedGroup.GroupId);
+                //_selectedGroup = selectedGroup;
                 _selectedUser = null;
 
                 // Ẩn toàn bộ UI liên quan đến member list khi chuyển nhóm
@@ -982,16 +983,21 @@ namespace UI_Chat_App
                 ConfirmInviteButton.Visibility = Visibility.Collapsed;
                 InviteFriendLabel.Visibility = Visibility.Collapsed;
 
+                var Admin = await GetUserNameById(_selectedGroup.CreatedBy);
+
+                bool isAdmin = _selectedGroup.Members.TryGetValue(App.CurrentUser.Id, out var role)
+               && role.Equals("admin", StringComparison.OrdinalIgnoreCase);
+                DeleteGroupButton.Visibility = isAdmin ? Visibility.Visible : Visibility.Collapsed;
+                Console.WriteLine($"Is Admin: {isAdmin}");
 
                 // 👉 Hiện Group profile, ẩn User profile
                 UserProfilePanel.Visibility = Visibility.Collapsed;
                 GroupProfilePanel.Visibility = Visibility.Visible;
                 UserProfileColumn.Width = new GridLength(230);
-
-                var Admin = await GetUserNameById(_selectedGroup.CreatedBy);
+                
                 ChatWithTextBlock.Text = $"Group: {_selectedGroup.Name}";
                 GroupProfileName.Text = _selectedGroup.Name;
-                GroupCreatedBy.Text = $"Created by: {Admin}";
+                GroupCreatedBy.Text = $"Admin: {Admin}";
                 GroupMemberCount.Text = $"Members: {_selectedGroup.MemberCount} members";
                 GroupProfileAvatar.Source = LoadAvatar(_selectedGroup.Avatar);
 
@@ -1086,7 +1092,7 @@ namespace UI_Chat_App
 
 
         //Cập nhật trạng thái "typing" lên Firebase
-
+                        
         private async Task SetTypingStatusAsync(bool isTyping)
         {
             if (_selectedUser == null || App.CurrentUser == null) return;
@@ -2244,10 +2250,9 @@ namespace UI_Chat_App
                     await _databaseService.SendSystemMessageToChatAsync(
                         _selectedGroup.GroupId,
                         $"{displayName} đã bị xoá khỏi nhóm bởi {App.CurrentUser.DisplayName}."
-                    );
-                    _selectedGroup = await _databaseService.GetGroupAsync(_selectedGroup.GroupId);
-                    UpdateGroupMemberCount();
+                    );                    
                     await RefreshGroupUIAsync();
+                    UpdateGroupMemberCount();                    
                 }
                 catch (Exception ex)
                 {
@@ -2272,29 +2277,14 @@ namespace UI_Chat_App
                 try
                 {
                     foreach (var member in selectedMembers)
+                    {
                         await _databaseService.ApproveMemberAsync(_selectedGroup.GroupId, member.Id);
-
+                        await _databaseService.SendSystemMessageToChatAsync(
+                            _selectedGroup.GroupId,
+                            $"{member.DisplayName} đã được duyệt vào nhóm bởi {App.CurrentUser.DisplayName}."
+                        );
+                    }
                     MessageBox.Show($"Đã duyệt {selectedMembers.Count} thành viên.");
-                    await RefreshGroupUIAsync();
-                    UpdateGroupMemberCount();
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Lỗi khi duyệt thành viên: " + ex.Message);
-                }
-            }
-        }
-
-
-
-        private async void ApprovePendingMember_Click(object sender, RoutedEventArgs e)
-        {
-            if (PendingMembersListBox.SelectedItem is PendingMemberModel selectedMember)
-            {
-                try
-                {
-                    await _databaseService.ApproveMemberAsync(_selectedGroup.GroupId, selectedMember.Id);
-                    MessageBox.Show($"Đã duyệt thành viên {selectedMember.DisplayName} vào nhóm.");
                     await RefreshGroupUIAsync();
                     UpdateGroupMemberCount();
                 }
@@ -2320,8 +2310,13 @@ namespace UI_Chat_App
                 try
                 {
                     foreach (var member in selectedMembers)
+                    {
                         await _databaseService.RejectMemberAsync(_selectedGroup.GroupId, member.Id);
-
+                        await _databaseService.SendSystemMessageToChatAsync(
+                            _selectedGroup.GroupId,
+                            $"{member.DisplayName} đã bị từ chối vào nhóm bởi {App.CurrentUser.DisplayName}."
+                        );
+                    }
                     MessageBox.Show($"Đã từ chối {selectedMembers.Count} thành viên.");
                     await RefreshGroupUIAsync();
                 }
@@ -2395,11 +2390,7 @@ namespace UI_Chat_App
                 try
                 {
                     await _databaseService.InviteMemberToGroupAsync(groupId, inviterId, friend.Id);
-                    invitedCount++;
-                    await _databaseService.SendSystemMessageToChatAsync(
-                        _currentChatRoomId,
-                        $"👥 {App.CurrentUser.DisplayName} đã thêm {friend.DisplayName} vào nhóm."
-                    );
+                    invitedCount++;                    
                 }
                 catch (Exception ex)
                 {
@@ -2416,9 +2407,9 @@ namespace UI_Chat_App
             // Nếu người mời là admin, cập nhật lại thông tin nhóm và member count
             if (_selectedGroup.Members.TryGetValue(inviterId, out var role) && role == "admin")
             {
-                _selectedGroup = await _databaseService.GetGroupAsync(groupId); // lấy lại dữ liệu nhóm mới
-                UpdateGroupMemberCount();
+                //_selectedGroup = await _databaseService.GetGroupAsync(groupId); // lấy lại dữ liệu nhóm mới                
                 await RefreshGroupUIAsync();
+                UpdateGroupMemberCount();
             }
         }
 
@@ -2504,12 +2495,13 @@ namespace UI_Chat_App
                         await _databaseService.ChangeGroupAdminAsync(_selectedGroup.GroupId, currentUserId, selectedAdminId);
                         await _databaseService.RemoveMemberFromGroupAsync(_selectedGroup.GroupId, currentUserId);
                         MessageBox.Show("Bạn đã rời nhóm và chuyển quyền admin thành công.");
-                        await RefreshGroupUIAsync();
-                        await RefreshFriendsAndRequestsAsync();
+                        var newAdminName = users.FirstOrDefault(u => u.Id == selectedAdminId)?.DisplayName ?? "[Người được chọn]";
                         await _databaseService.SendSystemMessageToChatAsync(
                             _selectedGroup.GroupId,
-                            $"{App.CurrentUser.DisplayName} đã rời nhóm và chuyển quyền admin cho {App.CurrentUser.DisplayName}."
+                            $"{App.CurrentUser.DisplayName} đã rời nhóm và chuyển quyền admin cho {newAdminName}."
                         );
+                        await RefreshGroupUIAsync();
+                        await RefreshFriendsAndRequestsAsync();
 
                     }
                     catch (Exception ex)
@@ -2541,6 +2533,41 @@ namespace UI_Chat_App
                 }
             }
         }
+
+        private async void DeleteGroupButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedGroup == null)
+            {
+                MessageBox.Show("Không có nhóm nào được chọn.");
+                return;
+            }
+
+            var currentUserId = App.CurrentUser.Id;            
+
+            var confirm = MessageBox.Show(
+                $"Bạn có chắc chắn muốn xóa nhóm \"{_selectedGroup.Name}\"? Tất cả tin nhắn và dữ liệu sẽ bị xoá vĩnh viễn.",
+                "Xác nhận xóa nhóm",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (confirm != MessageBoxResult.Yes) return;
+
+            try
+            {
+                await _databaseService.DeleteGroupAsync(_selectedGroup.GroupId);
+
+                MessageBox.Show("Đã xóa nhóm thành công.");
+
+                _selectedGroup = null;
+                ResetChatUI();
+                await RefreshGroupUIAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi khi xóa nhóm: " + ex.Message);
+            }
+        }
+
 
         private async void StartListeningToUserGroups()
         {

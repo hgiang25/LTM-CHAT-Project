@@ -1497,10 +1497,12 @@
                                     x:Name="ApproveSelectedButton"/>
 
                             <Button x:Name="RejectSelectedButton"
+                                    Margin="10,0,0,10"
+                                    Width="200"
+                                    Height="30"
                                     Content="Reject Selected"
                                     Click="RejectSelectedPendingMembers_Click"
-                                    Visibility="Collapsed"
-                                    Margin="5"/>
+                                    Visibility="Collapsed"/>
 
 
                             <Button x:Name="InviteMemberButton" Content="➕ Invite Member" Margin="0,5" Height="35" Click="InviteMemberButton_Click" Style="{StaticResource WindowButtonStyle}"/>
@@ -1530,6 +1532,15 @@
                             <Button x:Name="LeaveGroupButton" Content="🚪 Leave Group" Margin="0,5" Height="35" 
                                     Click="LeaveGroupButton_Click" Style="{StaticResource WindowButtonStyle}" 
                                     Foreground="Red"/>
+                            <Button x:Name="DeleteGroupButton"
+                                Content="🗑 Delete Group"
+                                Margin="0,5"
+                                Height="35"
+                                Click="DeleteGroupButton_Click"
+                                Visibility="Collapsed"
+                                Style="{StaticResource WindowButtonStyle}"
+                                Foreground="Red"/>
+
                         </StackPanel>
                     </StackPanel>
                 </ScrollViewer>

@@ -809,6 +809,32 @@ namespace ChatApp.Services
             return groupId;
         }
 
+        public async Task DeleteGroupAsync(string groupId)
+        {
+            var groupRef = _firestoreDb.Collection("groups").Document(groupId);
+            var messagesRef = _firestoreDb.Collection("messages").Document(groupId).Collection("messages");
+
+            // Kiểm tra nhóm có tồn tại
+            var groupSnapshot = await groupRef.GetSnapshotAsync();
+            if (!groupSnapshot.Exists)
+                throw new Exception("Nhóm không tồn tại.");
+
+            // 1. Xóa toàn bộ tin nhắn trong nhóm (song song)
+            var messagesSnapshot = await messagesRef.GetSnapshotAsync();
+            var deleteTasks = messagesSnapshot.Documents
+                .Select(doc => doc.Reference.DeleteAsync());
+
+            await Task.WhenAll(deleteTasks);
+
+            // 2. Xoá document metadata chatroom nếu có
+            await _firestoreDb.Collection("messages").Document(groupId).DeleteAsync();
+
+            // 3. Xoá document nhóm
+            await groupRef.DeleteAsync();
+
+            Console.WriteLine($"✅ Nhóm {groupId} và toàn bộ tin nhắn đã được xóa.");
+        }
+
 
         public async Task<List<string>> GetGroupMembersAsync(string groupId)
         {
@@ -942,6 +968,9 @@ namespace ChatApp.Services
             // Kiểm tra người mời có phải admin không
             bool isInviterAdmin = members.TryGetValue(inviterId, out var role) && role == "admin";
 
+            var Inviter = await GetUserAsync(inviterId);
+            var TargetUser = await GetUserAsync(targetUserId);
+
             if (isInviterAdmin)
             {
                 // Nếu có trong pending thì xoá
@@ -955,13 +984,14 @@ namespace ChatApp.Services
 
                 // Cập nhật cả members và pendingMembers
                 var updates = new Dictionary<string, object>
-        {
-            { "members", members },
-            { "pending members", pendingMembers },
-            { "memberCount", members.Count }
-        };
+                {
+                    { "members", members },
+                    { "pending members", pendingMembers },
+                    { "memberCount", members.Count }
+                };
 
                 await groupRef.UpdateAsync(updates);
+                SendSystemMessageToChatAsync(groupId, $"👥 {Inviter.DisplayName} đã thêm {TargetUser.DisplayName} vào nhóm.");
             }
             else
             {
@@ -972,6 +1002,7 @@ namespace ChatApp.Services
                 pendingMembers[targetUserId] = "invited";
 
                 await groupRef.UpdateAsync("pending members", pendingMembers);
+                SendSystemMessageToChatAsync(groupId, $"👥 {Inviter.DisplayName} đã mời {TargetUser.DisplayName} tham gia nhóm.");
             }
         }
 
@@ -1048,37 +1079,46 @@ namespace ChatApp.Services
             if (!snapshot.Exists)
                 throw new Exception("Group not found.");
 
-            var groupData = snapshot.ConvertTo<GroupData>();
-            groupData.GroupId = snapshot.Id;
+            var data = snapshot.ToDictionary();
 
-            // Handle members field
+            var groupData = new GroupData
+            {
+                GroupId = snapshot.Id,
+                Name = data.ContainsKey("name") ? data["name"].ToString() : "[No name]",
+                CreatedBy = data.ContainsKey("createdBy") ? data["createdBy"].ToString() : "",
+                Avatar = data.ContainsKey("avatar") ? data["avatar"].ToString() : "Icons/group.png",
+                MemberCount = data.ContainsKey("memberCount") ? Convert.ToInt32(data["memberCount"]) : 0,
+                Members = new Dictionary<string, string>(),
+                PendingMembers = new Dictionary<string, string>()
+            };
+
+            // Xử lý trường "members"
             if (snapshot.ContainsField("members"))
             {
                 var membersMap = snapshot.GetValue<Dictionary<string, object>>("members");
                 groupData.Members = membersMap.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString());
-                Console.WriteLine($"Loaded members: {string.Join(", ", groupData.Members.Select(kvp => $"{kvp.Key}: {kvp.Value}"))}");
+                Console.WriteLine($"[DEBUG] Loaded members: {string.Join(", ", groupData.Members.Select(kvp => $"{kvp.Key}: {kvp.Value}"))}");
             }
             else
             {
-                groupData.Members = new Dictionary<string, string>();
-                Console.WriteLine("No members found in group document.");
+                Console.WriteLine("[DEBUG] No members found in group document.");
             }
 
-            // Handle pendingMembers field
+            // Xử lý trường "pending members"
             if (snapshot.ContainsField("pending members"))
             {
-                var pendingMembersMap = snapshot.GetValue<Dictionary<string, object>>("pending members");
-                groupData.PendingMembers = pendingMembersMap.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString());
-                Console.WriteLine($"Loaded pending members: {string.Join(", ", groupData.PendingMembers.Select(kvp => $"{kvp.Key}: {kvp.Value}"))}");
+                var pendingMap = snapshot.GetValue<Dictionary<string, object>>("pending members");
+                groupData.PendingMembers = pendingMap.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString());
+                Console.WriteLine($"[DEBUG] Loaded pending members: {string.Join(", ", groupData.PendingMembers.Select(kvp => $"{kvp.Key}: {kvp.Value}"))}");
             }
             else
             {
-                groupData.PendingMembers = new Dictionary<string, string>();
-                Console.WriteLine("No pending members found in group document.");
+                Console.WriteLine("[DEBUG] No pending members found in group document.");
             }
 
             return groupData;
         }
+
 
 
         public async Task<List<UserData>> LoadUsersByIdsAsync(List<string> userIds)
@@ -1128,7 +1168,8 @@ namespace ChatApp.Services
 
                 transaction.Update(groupRef, new Dictionary<string, object>
         {
-            { "members", members }
+            { "members", members },
+            { "createdBy", newAdminId }
         });
             });
         }
