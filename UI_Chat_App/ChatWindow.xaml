@@ -1295,6 +1295,17 @@
                         </StackPanel>
                     </Grid>
 
+                    <TextBlock x:Name="EmptyPromptTextBlock"
+                               Text="Please choose someone to start"
+                               FontSize="30"
+                               FontStyle="Italic"
+                               FontWeight="Bold"
+                               Foreground="Gray"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Visibility="Visible"
+                               Margin="10"
+                               Grid.Row="1"/>
 
                     <!-- Khu vực hiển thị tin nhắn -->
                     <ScrollViewer x:Name="MessagesScrollViewer" Grid.Row="1" Grid.ColumnSpan="2" VerticalScrollBarVisibility="Auto" Margin="10">
