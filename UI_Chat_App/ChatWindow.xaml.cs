@@ -80,7 +80,8 @@ namespace UI_Chat_App
             await InitializeChatAsync();
             //_refreshTimer.Start();                     
             await StartListeningForMessages(_currentChatRoomId);
-
+            //await _databaseService.InitializeAllFriendPrioritiesAsync();
+            //await _databaseService.AddBlockedFieldToAllFriendsAsync();
             try
             {
                 if (!AgoraService.Instance.Initialize())
@@ -182,7 +183,7 @@ namespace UI_Chat_App
                 // Gán ItemsSource cho các ListBox
                 UserListBox.ItemsSource = _chatrooms;
                 FriendRequestsListBox.ItemsSource = _friendRequests;
-                AllUsersListBox.ItemsSource = _allUsers;
+                //AllUsersListBox.ItemsSource = _allUsers;
 
                 _databaseService.StartListeningForNotifications(App.CurrentUser.Id, notif =>
                 {
@@ -239,10 +240,11 @@ namespace UI_Chat_App
                 else if (previouslySelectedItem is GroupData g)
                     previouslySelectedChatroomId = g.GroupId;
 
-                // ==== Load Friends ====
+                // ==== Load Friends using shared method ====
                 var friends = await _databaseService.GetFriendsAsync(App.CurrentUser.Id);
                 var newUsers = new ObservableCollection<UserData>();
-                foreach (var friend in friends ?? Enumerable.Empty<UserData>())
+
+                foreach (var friend in friends)
                 {
                     if (string.IsNullOrEmpty(friend.Avatar))
                     {
@@ -251,6 +253,30 @@ namespace UI_Chat_App
                     }
                     newUsers.Add(friend);
                 }
+                // ==== Sort theo Priority DESC ====
+                newUsers = new ObservableCollection<UserData>(
+                    newUsers.OrderByDescending(user => (int)(user.Tag ?? 0))
+                            .ThenBy(user => user.DisplayName));
+
+
+                // ==== Load Friend Requests ====
+                var receivedRequests = await _databaseService.GetFriendRequestsAsync(App.CurrentUser.Id);
+                var sentRequests = await _databaseService.GetSentFriendRequestsAsync(App.CurrentUser.Id);
+
+                // ==== Load All Users (exclude friends and pending requests) ====
+                var usersDict = await _databaseService.GetAllUsersAsync(_idToken);
+                var allUsers = usersDict.Values.Where(user => user.Id != App.CurrentUser.Id).ToList();
+
+                var friendIds = newUsers.Select(f => f.Id).ToHashSet();
+                var receivedRequestIds = receivedRequests?.Select(r => r.FriendRequest.FromUserId).ToHashSet() ?? new HashSet<string>();
+                var sentRequestIds = sentRequests?.Select(r => r.FriendRequest.ToUserId).ToHashSet() ?? new HashSet<string>();
+
+                var nonFriends = allUsers
+                    .Where(user =>
+                        !friendIds.Contains(user.Id) &&
+                        !sentRequestIds.Contains(user.Id) &&
+                        !receivedRequestIds.Contains(user.Id))
+                    .ToList();
 
                 // ==== Load Groups ====
                 var groups = await _databaseService.GetGroupsForUserAsync(App.CurrentUser.Id);
@@ -264,35 +290,35 @@ namespace UI_Chat_App
                     newGroups.Add(group);
                 }
 
-                await Dispatcher.InvokeAsync(() =>
+                // ==== UI Updates ====
+                await Dispatcher.InvokeAsync(async () =>
                 {
-                    // ==== Update _users nếu thay đổi ====
                     if (!_users.SequenceEqual(newUsers, new UserDataComparer()))
                     {
                         _users.Clear();
-                        foreach (var user in newUsers) _users.Add(user);
+                        foreach (var user in newUsers)
+                            _users.Add(user);
                     }
 
-                    // ==== Update _groups nếu thay đổi ====
                     if (!_groups.SequenceEqual(newGroups, new GroupDataComparer()))
                     {
                         _groups.Clear();
-                        foreach (var group in newGroups) _groups.Add(group);
+                        foreach (var group in newGroups)
+                            _groups.Add(group);
                     }
 
-                    // ==== Gộp _users + _groups vào _chatrooms ====
                     var newChatrooms = new ObservableCollection<object>(_users.Cast<object>().Concat(_groups));
                     if (!_chatrooms.SequenceEqual(newChatrooms, new ChatroomComparer()))
                     {
                         _chatrooms.Clear();
-                        foreach (var chatroom in newChatrooms) _chatrooms.Add(chatroom);
+                        foreach (var chatroom in newChatrooms)
+                            _chatrooms.Add(chatroom);
                     }
 
-                    // ==== Gán lại ItemSource nếu chưa gán ====
                     if (UserListBox.ItemsSource != _chatrooms)
                         UserListBox.ItemsSource = _chatrooms;
 
-                    // ==== Khôi phục lựa chọn ====
+                    // Restore selection
                     if (!string.IsNullOrEmpty(previouslySelectedChatroomId))
                     {
                         var itemToSelect = _chatrooms.FirstOrDefault(item =>
@@ -319,34 +345,15 @@ namespace UI_Chat_App
                             }
                         }
                     }
-                });
 
-                // ==== Load Friend Requests (received) ====
-                var receivedRequests = await _databaseService.GetFriendRequestsAsync(App.CurrentUser.Id);
-                await Dispatcher.InvokeAsync(() =>
-                {
                     _friendRequests.Clear();
                     foreach (var request in receivedRequests ?? Enumerable.Empty<FriendRequestWithUserInfo>())
                         _friendRequests.Add(request);
-                });
 
-                // ==== Load Sent Requests ====
-                var sentRequests = await _databaseService.GetSentFriendRequestsAsync(App.CurrentUser.Id);
-                await Dispatcher.InvokeAsync(() =>
-                {
                     _sentFriendRequests.Clear();
                     foreach (var request in sentRequests ?? Enumerable.Empty<FriendRequestWithUserInfo>())
                         _sentFriendRequests.Add(request);
-                });
 
-                // ==== Load All Users (chưa là bạn) ====
-                var usersDict = await _databaseService.GetAllUsersAsync(_idToken);
-                var allUsers = usersDict.Values.Where(user => user.Id != App.CurrentUser.Id).ToList();
-                var friendIds = friends?.Select(f => f.Id).ToList() ?? new List<string>();
-                var nonFriends = allUsers.Where(user => !friendIds.Contains(user.Id)).ToList();
-
-                await Dispatcher.InvokeAsync(async () =>
-                {
                     _allUsers.Clear();
                     foreach (var user in nonFriends)
                     {
@@ -358,18 +365,12 @@ namespace UI_Chat_App
                         _allUsers.Add(user);
                     }
 
-                    // Hiển thị danh sách phù hợp theo tab
                     if (TabControl.SelectedIndex == 0)
                     {
                         if (UserListBox.ItemsSource != _chatrooms)
                             UserListBox.ItemsSource = _chatrooms;
                     }
-                    else if (TabControl.SelectedIndex == 1)
-                    {
-                        AllUsersListBox.ItemsSource = _allUsers;
-                    }
 
-                    // Áp dụng tìm kiếm nếu có
                     if (!string.IsNullOrWhiteSpace(SearchTextBox.Text))
                     {
                         SearchTextBox_TextChanged(null, null);
@@ -381,6 +382,8 @@ namespace UI_Chat_App
                 Console.WriteLine($"Failed to refresh: {ex.Message}");
             }
         }
+
+
 
         private class GroupDataComparer : IEqualityComparer<GroupData>
         {
@@ -1013,7 +1016,7 @@ namespace UI_Chat_App
                         }
                         _allUsers.Add(user);
                     }
-                    AllUsersListBox.ItemsSource = _allUsers;
+                    //AllUsersListBox.ItemsSource = _allUsers;
                 });
             }
             catch (Exception ex)
@@ -1237,6 +1240,17 @@ namespace UI_Chat_App
                 return;
             }
 
+            // ✅ Kiểm tra block TRƯỚC khi gửi
+            if (_selectedUser != null)
+            {
+                bool isBlocked = await _databaseService.IsBlockedBetweenUsers(App.CurrentUser.Id, _selectedUser.Id);
+                if (isBlocked)
+                {
+                    MessageBox.Show("Bạn không thể gửi tin nhắn vì đã bị chặn hoặc đã chặn người này.", "Bị chặn", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+            }
+
             var message = new MessageData
             {
                 SenderId = App.CurrentUser.Id,
@@ -1269,17 +1283,16 @@ namespace UI_Chat_App
 
             if (_selectedUser != null)
             {
-                // Gửi thông báo cho tin nhắn cá nhân
                 await _databaseService.SendNotificationAsync(_selectedUser.Id, App.CurrentUser.Id, messageContent);
                 await RefreshNotificationAsync();
             }
+
             if (_selectedGroup != null)
             {
                 var groupMembers = await _databaseService.GetGroupMembersAsync(_selectedGroup.GroupId);
                 foreach (var memberId in groupMembers)
                 {
                     Console.WriteLine($"Gửi thông báo tới thành viên nhóm: {memberId}");
-
                     if (memberId != App.CurrentUser.Id)
                     {
                         await _databaseService.SendNotificationAsync(memberId, App.CurrentUser.Id, messageContent, _selectedGroup.GroupId);
@@ -1288,8 +1301,8 @@ namespace UI_Chat_App
 
                 await RefreshNotificationAsync();
             }
-
         }
+
 
 
         private async void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -1327,7 +1340,7 @@ namespace UI_Chat_App
             }
 
             await _databaseService.StopListeningForCalls();
-            AgoraService.Instance.Dispose();
+            //AgoraService.Instance.Dispose();
         }
 
         private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -1415,46 +1428,51 @@ namespace UI_Chat_App
             }
         }
 
+        private void ResetSearchResults()
+        {
+            if (TabControl.SelectedIndex == 0) // Tab Chat
+            {
+                UserListBox.ItemsSource = _chatrooms;
+            }
+            else if (TabControl.SelectedIndex == 1) // Tab Add Friends
+            {
+                AllUsersListBox.ItemsSource = null;
+            }
+        }
+
+
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             string searchText = SearchTextBox.Text.Trim().ToLower();
 
             if (string.IsNullOrEmpty(searchText))
             {
-                // Nếu không có từ khóa tìm kiếm, hiển thị danh sách mặc định
-                if (TabControl.SelectedIndex == 0) // Tab Chat
-                {
-                    UserListBox.ItemsSource = _chatrooms;
-                }
-                else if (TabControl.SelectedIndex == 1) // Tab Add Friends
-                {
-                    AllUsersListBox.ItemsSource = _allUsers;
-                }
+                ResetSearchResults();
                 return;
             }
 
-            // Tìm kiếm dựa trên DisplayName và Email
-            if (TabControl.SelectedIndex == 0) // Tab Chat: Tìm bạn bè
+            if (TabControl.SelectedIndex == 0) // Tìm trong bạn bè
             {
                 var matchingFriends = _users
                     .Where(user => user.DisplayName.ToLower().Contains(searchText) ||
                                   user.Email.ToLower().Contains(searchText))
-                    .OrderBy(user => user.DisplayName.ToLower().Contains(searchText) ? 0 : 1) // Ưu tiên DisplayName
+                    .OrderBy(user => user.DisplayName.ToLower().Contains(searchText) ? 0 : 1)
                     .ToList();
 
                 UserListBox.ItemsSource = matchingFriends;
             }
-            else if (TabControl.SelectedIndex == 1) // Tab Add Friends: Tìm người chưa phải bạn bè
+            else if (TabControl.SelectedIndex == 1) // Tìm trong tất cả user
             {
                 var matchingNonFriends = _allUsers
                     .Where(user => user.DisplayName.ToLower().Contains(searchText) ||
                                   user.Email.ToLower().Contains(searchText))
-                    .OrderBy(user => user.DisplayName.ToLower().Contains(searchText) ? 0 : 1) // Ưu tiên DisplayName
+                    .OrderBy(user => user.DisplayName.ToLower().Contains(searchText) ? 0 : 1)
                     .ToList();
 
                 AllUsersListBox.ItemsSource = matchingNonFriends;
             }
         }
+
 
         private async void UserAvatar_Click(object sender, MouseButtonEventArgs e)
         {
@@ -1716,7 +1734,7 @@ namespace UI_Chat_App
 
                 var groupId = await _databaseService.CreateGroupAsync(groupName, App.CurrentUser.Id, memberIds);
                 MessageBox.Show($"Tạo nhóm thành công!\nID nhóm: {groupId}");
-
+                await RefreshFriendsAndRequestsAsync();
                 // (Tuỳ chọn mở chat nhóm hoặc cập nhật danh sách nhóm UI)
 
                 //this.Close();
@@ -1742,14 +1760,52 @@ namespace UI_Chat_App
                 TabControl.SelectedIndex = 2;
             }
         }
-        private void ThumbtackButton_Click(object sender, RoutedEventArgs e)
+        private async void ThumbtackButton_Click(object sender, RoutedEventArgs e)
         {
-            // Code xử lý khi nhấn nút thêm nhóm
+            if (sender is Button button && button.DataContext is UserData user)
+            {
+                await _databaseService.ToggleFriendPriorityAsync(App.CurrentUser.Id, user.Id);
+                await RefreshFriendsAndRequestsAsync();
+            }
         }
-        private void BlockUserButton_Click(object sender, RoutedEventArgs e)
+
+
+
+        private async void BlockUserButton_Click(object sender, RoutedEventArgs e)
         {
-            // Code xử lý khi nhấn nút thêm nhóm
+            if (sender is Button button && button.DataContext is UserData user)
+            {
+                // ✅ Kiểm tra xem bạn có đang bị người đó block không
+                bool theyBlockedMe = await _databaseService.IsBlockingUser(user.Id, App.CurrentUser.Id);
+                if (theyBlockedMe)
+                {
+                    MessageBox.Show(
+                        $"Không thể thực hiện thao tác vì bạn đang bị {user.DisplayName} chặn.",
+                        "Không thể chặn", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                bool currentlyBlocking = user.IsBlocked;
+
+                var result = MessageBox.Show(
+                    $"Bạn có chắc muốn {(currentlyBlocking ? "bỏ chặn" : "chặn")} {user.DisplayName}?",
+                    "Xác nhận", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                if (result != MessageBoxResult.Yes) return;
+
+                // ✅ Gọi Firestore để set trạng thái block
+                await _databaseService.SetBlockStatusAsync(App.CurrentUser.Id, user.Id, !currentlyBlocking);
+
+                // ✅ Cập nhật trực tiếp vào object gốc để trigger UI update
+                user.IsBlocked = !currentlyBlocking;
+
+                MessageBox.Show(
+                    $"{(currentlyBlocking ? "Đã bỏ chặn" : "Đã chặn")} {user.DisplayName}.",
+                    "Thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
         }
+
+
         private void ChatTabButton_Click(object sender, RoutedEventArgs e)
         {
             // Chuyển sang tab Chat
@@ -2041,7 +2097,7 @@ namespace UI_Chat_App
                     await Dispatcher.InvokeAsync(() =>
                     {
                         AllUsersListBox.ItemsSource = null;
-                        AllUsersListBox.ItemsSource = _allUsers; // Làm mới danh sách người dùng
+                        //AllUsersListBox.ItemsSource = _allUsers; // Làm mới danh sách người dùng
                     });
                 }
                 catch (Exception ex)
@@ -2084,7 +2140,7 @@ namespace UI_Chat_App
                         UserListBox.ItemsSource = null;
                         UserListBox.ItemsSource = _users; // Làm mới danh sách bạn bè
                         AllUsersListBox.ItemsSource = null;
-                        AllUsersListBox.ItemsSource = _allUsers; // Làm mới danh sách người dùng
+                        //AllUsersListBox.ItemsSource = _allUsers; // Làm mới danh sách người dùng
 
                         // Tự động chọn người bạn mới
                         var newFriend = _users.FirstOrDefault(u => u.Id == requestWithInfo.FriendRequest.FromUserId);
@@ -2163,7 +2219,7 @@ namespace UI_Chat_App
                     await Dispatcher.InvokeAsync(() =>
                     {
                         AllUsersListBox.ItemsSource = null;
-                        AllUsersListBox.ItemsSource = _allUsers; // Làm mới danh sách người dùng
+                        //AllUsersListBox.ItemsSource = _allUsers; // Làm mới danh sách người dùng
                     });
                 }
                 catch (Exception ex)
@@ -2175,15 +2231,27 @@ namespace UI_Chat_App
 
 
 
-        private void DeleteUserButton_Click(object sender, RoutedEventArgs e)
+        private async void DeleteUserButton_Click(object sender, RoutedEventArgs e)
         {
-            // Code xử lý khi nhấn nút xóa người dùng
-        }
+            if (_selectedUser != null)
+            {
+                var result = MessageBox.Show($"Bạn có chắc chắn muốn xóa {_selectedUser.DisplayName} khỏi danh sách bạn bè không?",
+                    "Xác nhận", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
-        private void UserPenButton_Click(object sender, RoutedEventArgs e)
-        {
-            // Code xử lý khi nhấn nút chỉnh sửa thông tin người dùng
-        }
+                if (result == MessageBoxResult.Yes)
+                {
+                    try
+                    {
+                        await _databaseService.RemoveFriendAsyncAndDeleteMessages(App.CurrentUser.Id, _selectedUser.Id);
+                        await RefreshFriendsAndRequestsAsync(); // Cập nhật lại UI
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Xóa bạn thất bại: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
+        }              
 
         private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -2199,7 +2267,7 @@ namespace UI_Chat_App
                 }
                 else if (TabControl.SelectedIndex == 1) // Tab Add Friends
                 {
-                    AllUsersListBox.ItemsSource = _allUsers;
+                    //AllUsersListBox.ItemsSource = _allUsers;
                 }
                 else if (TabControl.SelectedIndex == 2)
                 {

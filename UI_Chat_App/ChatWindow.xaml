@@ -265,15 +265,29 @@
 
                     <!-- User Info -->
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0">
-                        <TextBlock Text="{Binding DisplayName}" 
-                           FontSize="16" 
-                           FontWeight="SemiBold" 
-                           Foreground="#333333"/>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding DisplayName}" 
+                   FontSize="16" 
+                   FontWeight="SemiBold" 
+                   Foreground="#333333"/>
+
+                            <TextBlock Text="📌"
+           FontSize="16"
+           Visibility="{Binding Tag, Converter={StaticResource PriorityToVisibilityConverter}}"
+           Margin="5,0,0,0"/>
+                            <!-- Icon block nếu đã block -->
+                            <TextBlock Text="🚫"
+           Visibility="{Binding IsBlocked, Converter={StaticResource BlockToVisibilityConverter}}"
+           Margin="5,0,0,0" />
+
+                        </StackPanel>
+
                         <TextBlock Text="{Binding IsOnline, Converter={StaticResource BooleanToOnlineStatusConverter}}" 
-                           FontSize="12" 
-                           Foreground="{Binding IsOnline, Converter={StaticResource BooleanToColorConverter}}" 
-                           Margin="0,3,0,0"/>
+               FontSize="12" 
+               Foreground="{Binding IsOnline, Converter={StaticResource BooleanToColorConverter}}" 
+               Margin="0,3,0,0"/>
                     </StackPanel>
+
 
                     <!-- Popup và nút More Options -->
                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
@@ -405,16 +419,6 @@
 
                     <!-- More Options giống User -->
                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                        <!--<Button x:Name="MoreOptionsButton"
-                        Width="30" Height="30"
-                        Background="Transparent"
-                        BorderBrush="Transparent"
-                        Click="GroupMoreOptionsButton_Click"
-                        ToolTip="More Options"
-                        Style="{StaticResource WindowButtonStyle}">
-                            <Image Source="Icons/more_options.png" Width="20" Height="20"/>
-                        </Button>-->
-
                         <Popup x:Name="DeletePopup"
                        Placement="Top"
                        PlacementTarget="{Binding ElementName=MoreOptionsButton}"
@@ -422,29 +426,6 @@
                        AllowsTransparency="True">
                             <Border Background="White" CornerRadius="8" Padding="5" BorderBrush="LightGray" BorderThickness="1">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <!--<Button Width="30" Height="30"
-                                    Background="Transparent"
-                                    BorderBrush="Transparent"
-                                    Click="LeaveGroupButton_Click"
-                                    Style="{StaticResource WindowButtonStyle}">
-                                        <Image Source="Icons/exit.png" Width="20" Height="20"/>
-                                    </Button>-->
-
-                                    <!--<Button Width="30" Height="30"
-                                    Background="Transparent"
-                                    BorderBrush="Transparent"
-                                    Click="PinGroupButton_Click"
-                                    Style="{StaticResource WindowButtonStyle}">
-                                        <Image Source="Icons/thumbtack.png" Width="20" Height="20"/>
-                                    </Button>-->
-
-                                    <!--<Button Width="30" Height="30"
-                                    Background="Transparent"
-                                    BorderBrush="Transparent"
-                                    Click="DeleteGroupButton_Click"
-                                    Style="{StaticResource WindowButtonStyle}">
-                                        <Image Source="Icons/trash.png" Width="20" Height="20"/>
-                                    </Button>-->
                                 </StackPanel>
                             </Border>
                         </Popup>

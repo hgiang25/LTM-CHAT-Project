@@ -11,6 +11,7 @@ using Google.Cloud.Firestore.V1;
 using UI_Chat_App;
 using Google.Apis.Auth.OAuth2;
 using System.Windows.Forms;
+using System.Threading;
 
 namespace ChatApp.Services
 {
@@ -33,7 +34,7 @@ namespace ChatApp.Services
                 {
                     JsonCredentials = File.ReadAllText(pathToServiceAccountKey)
                 };
-                _firestoreDb = FirestoreDb.Create("fir-login-4f488", builder.Build());
+                _firestoreDb = FirestoreDb.Create("my-chatapp-6e8f6", builder.Build());
             }
             catch (Exception ex)
             {
@@ -364,7 +365,9 @@ namespace ChatApp.Services
                 {
                     FriendId = request.FromUserId,
                     Status = "accepted",
-                    AddedAt = Timestamp.FromDateTime(DateTime.UtcNow)
+                    AddedAt = Timestamp.FromDateTime(DateTime.UtcNow),
+                    Priority = 0,
+                    Blocked = false
                 });
 
                 DocumentReference friendRef2 = _firestoreDb
@@ -374,7 +377,9 @@ namespace ChatApp.Services
                 {
                     FriendId = request.ToUserId,
                     Status = "accepted",
-                    AddedAt = Timestamp.FromDateTime(DateTime.UtcNow)
+                    AddedAt = Timestamp.FromDateTime(DateTime.UtcNow),
+                    Priority = 0,
+                    Blocked = false
                 });
 
                 Console.WriteLine($"Friend request accepted: {request.FromUserId} and {request.ToUserId}");
@@ -401,30 +406,233 @@ namespace ChatApp.Services
             }
         }
 
+        public async Task InitializeAllFriendPrioritiesAsync()
+        {
+            var usersRef = _firestoreDb.Collection("users");
+            var usersSnapshot = await usersRef.GetSnapshotAsync();
+
+            foreach (var userDoc in usersSnapshot.Documents)
+            {
+                string userId = userDoc.Id;
+                var friendsRef = usersRef.Document(userId).Collection("friends");
+                var friendsSnapshot = await friendsRef.GetSnapshotAsync();
+
+                foreach (var friendDoc in friendsSnapshot.Documents)
+                {
+                    if (!friendDoc.ContainsField("Priority"))
+                    {
+                        await friendDoc.Reference.UpdateAsync(new Dictionary<string, object>
+                {
+                    { "Priority", 0 }
+                });
+
+                        Console.WriteLine($"[OK] Updated Priority=0 for friend {friendDoc.Id} of user {userId}");
+                    }
+                }
+            }
+        }
+
+        public async Task AddBlockedFieldToAllFriendsAsync()
+        {
+            var usersRef = _firestoreDb.Collection("users");
+            var usersSnapshot = await usersRef.GetSnapshotAsync();
+
+            foreach (var userDoc in usersSnapshot.Documents)
+            {
+                string userId = userDoc.Id;
+                var friendsRef = usersRef.Document(userId).Collection("friends");
+                var friendsSnapshot = await friendsRef.GetSnapshotAsync();
+
+                foreach (var friendDoc in friendsSnapshot.Documents)
+                {
+                    if (!friendDoc.ContainsField("Blocked"))
+                    {
+                        await friendDoc.Reference.UpdateAsync(new Dictionary<string, object>
+                {
+                    { "Blocked", false }
+                });
+
+                        Console.WriteLine($"[OK] Added Blocked=false to friend {friendDoc.Id} of user {userId}");
+                    }
+                }
+            }
+
+            Console.WriteLine("✅ Completed adding 'Blocked' field to all friends.");
+        }
+
+        public async Task<bool> IsBlockedBetweenUsers(string userId, string otherUserId)
+        {
+            var myFriendRef = _firestoreDb.Collection("users").Document(userId).Collection("friends").Document(otherUserId);
+            var otherFriendRef = _firestoreDb.Collection("users").Document(otherUserId).Collection("friends").Document(userId);
+
+            var myDoc = await myFriendRef.GetSnapshotAsync();
+            var otherDoc = await otherFriendRef.GetSnapshotAsync();
+
+            bool iBlocked = myDoc.Exists && myDoc.ContainsField("Blocked") && myDoc.GetValue<bool>("Blocked");
+            bool theyBlocked = otherDoc.Exists && otherDoc.ContainsField("Blocked") && otherDoc.GetValue<bool>("Blocked");
+
+            return iBlocked || theyBlocked;
+        }
+
+        public async Task<bool> IsBlockingUser(string userId, string targetUserId)
+        {
+            var docRef = _firestoreDb.Collection("users").Document(userId)
+                .Collection("friends").Document(targetUserId);
+
+            var snapshot = await docRef.GetSnapshotAsync();
+
+            if (!snapshot.Exists || !snapshot.ContainsField("Blocked")) return false;
+
+            return snapshot.GetValue<bool>("Blocked");
+        }
+
+        public async Task SetBlockStatusAsync(string userId, string targetUserId, bool isBlocked)
+        {
+            var docRef = _firestoreDb.Collection("users").Document(userId)
+                .Collection("friends").Document(targetUserId);
+
+            await docRef.UpdateAsync(new Dictionary<string, object>
+    {
+        { "Blocked", isBlocked }
+    });
+        }
+
+
+
+
+        public async Task RemoveFriendAsyncAndDeleteMessages(string currentUserId, string targetUserId)
+        {
+            try
+            {
+                // Xóa mối quan hệ bạn bè ở cả 2 phía
+                var currentUserFriendRef = _firestoreDb
+                    .Collection("users").Document(currentUserId)
+                    .Collection("friends").Document(targetUserId);
+                var targetUserFriendRef = _firestoreDb
+                    .Collection("users").Document(targetUserId)
+                    .Collection("friends").Document(currentUserId);
+
+                WriteBatch batch = _firestoreDb.StartBatch();
+                batch.Delete(currentUserFriendRef);
+                batch.Delete(targetUserFriendRef);
+
+                // Xóa toàn bộ tin nhắn giữa hai người dùng
+                string chatRoomId = GenerateChatRoomId(currentUserId, targetUserId);
+                CollectionReference messagesRef = _firestoreDb
+                    .Collection("messages").Document(chatRoomId)
+                    .Collection("messages");
+
+                var snapshot = await messagesRef.GetSnapshotAsync();
+                foreach (var doc in snapshot.Documents)
+                {
+                    batch.Delete(doc.Reference);
+                }
+
+                // Xóa document cha của chatRoom (nếu không cần giữ lại)
+                var chatRoomDoc = _firestoreDb.Collection("messages").Document(chatRoomId);
+                batch.Delete(chatRoomDoc);
+
+                await batch.CommitAsync();
+
+                Console.WriteLine($"Removed friend and deleted all messages between {currentUserId} and {targetUserId}");
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to remove friend and delete messages: {ex.Message}", ex);
+            }
+        }
+
+        public async Task SetFriendPriorityAsync(string userId, string friendId, int priority)
+        {
+            DocumentReference friendRef = _firestoreDb
+                .Collection("users").Document(userId)
+                .Collection("friends").Document(friendId);
+
+            await friendRef.UpdateAsync("Priority", priority);
+        }
+
+
+        public async Task ToggleFriendPriorityAsync(string userId, string friendId)
+        {
+            var friendRef = _firestoreDb
+                .Collection("users").Document(userId)
+                .Collection("friends").Document(friendId);
+
+            var snapshot = await friendRef.GetSnapshotAsync();
+            if (!snapshot.Exists) return;
+
+            var friendData = snapshot.ConvertTo<FriendData>();
+            int currentPriority = 0;
+            if (snapshot.ContainsField("Priority"))
+            {
+                currentPriority = snapshot.GetValue<int>("Priority");
+            }
+
+            if (currentPriority > 0)
+            {
+                // Nếu đã ghim, thì bỏ ghim (Priority = 0)
+                await friendRef.UpdateAsync(new Dictionary<string, object>
+        {
+            { "Priority", 0 }
+        });
+                Console.WriteLine($"Unpinned friend {friendId}");
+            }
+            else
+            {
+                // Nếu chưa ghim, thì ghim với Priority cao nhất + 1
+                var friendsRef = _firestoreDb
+                    .Collection("users").Document(userId)
+                    .Collection("friends");
+
+                var highestSnapshot = await friendsRef
+                    .WhereGreaterThan("Priority", 0)
+                    .OrderByDescending("Priority")
+                    .Limit(1)
+                    .GetSnapshotAsync();
+
+                int newPriority = 1;
+                if (highestSnapshot.Count > 0)
+                {
+                    newPriority = highestSnapshot.Documents[0].GetValue<int>("Priority") + 1;
+                }
+
+                await friendRef.UpdateAsync(new Dictionary<string, object>
+        {
+            { "Priority", newPriority }
+        });
+
+                Console.WriteLine($"Pinned friend {friendId} with priority {newPriority}");
+            }
+        }
+
+
+
         public async Task<IEnumerable<UserData>> GetFriendsAsync(string userId)
         {
             try
             {
-                CollectionReference friendsRef = _firestoreDb
+                var friendsRef = _firestoreDb
                     .Collection("users").Document(userId)
                     .Collection("friends");
-                QuerySnapshot snapshot = await friendsRef
+
+                var snapshot = await friendsRef
                     .WhereEqualTo("Status", "accepted")
                     .GetSnapshotAsync();
 
-                var friendIds = snapshot.Documents
-                    .Select(doc => doc.ConvertTo<FriendData>().FriendId)
-                    .ToList();
+                var friends = new List<UserData>();
 
-                List<UserData> friends = new List<UserData>();
-                foreach (var friendId in friendIds)
+                foreach (var doc in snapshot.Documents)
                 {
-                    var user = await GetUserAsync(friendId);
+                    var friendData = doc.ConvertTo<FriendData>();
+                    var user = await GetUserAsync(friendData.FriendId);
                     if (user != null)
                     {
+                        user.Tag = friendData.Priority;
+                        user.IsBlocked = friendData.Blocked;
                         friends.Add(user);
                     }
                 }
+
 
                 Console.WriteLine($"Loaded {friends.Count} friends for user {userId}");
                 return friends;
@@ -434,6 +642,8 @@ namespace ChatApp.Services
                 throw new Exception($"Failed to get friends: {ex.Message}", ex);
             }
         }
+
+
 
         public async Task<bool> AreFriendsAsync(string userId1, string userId2)
         {
@@ -697,14 +907,24 @@ namespace ChatApp.Services
         }
 
         private FirestoreChangeListener _messageListener;
+        //private bool _isMessageListenerActive = false;
+        private CancellationTokenSource _messageListeningCts;
+        private string _activeListeningRoomId;
 
         public async Task StartListeningToMessagesAsync(string chatRoomId, Action<MessageData> onMessageReceived)
         {
+            // Ngắt lắng nghe trước đó (nếu có)
             if (_messageListener != null)
             {
-                await _messageListener.StopAsync();
+                try { await _messageListener.StopAsync(); } catch { /* Ignore */ }
                 _messageListener = null;
             }
+
+            _messageListeningCts?.Cancel();
+            _messageListeningCts = new CancellationTokenSource();
+            var localToken = _messageListeningCts.Token;
+
+            _activeListeningRoomId = chatRoomId;
 
             var messagesRef = _firestoreDb
                 .Collection("messages")
@@ -715,45 +935,31 @@ namespace ChatApp.Services
 
             _messageListener = query.Listen(snapshot =>
             {
+                // ❗ Nếu user đã đổi phòng hoặc cancel rồi, thì bỏ qua dữ liệu nhận được
+                if (chatRoomId != _activeListeningRoomId || localToken.IsCancellationRequested)
+                    return;
+
                 foreach (var docChange in snapshot.Changes)
                 {
                     if (docChange.ChangeType == Google.Cloud.Firestore.DocumentChange.Type.Added)
                     {
                         var dict = docChange.Document.ToDictionary();
-                        var message = new MessageData();
-                        message.MessageId = docChange.Document.Id;
-
-                        // Các trường cơ bản
-                        if (dict.ContainsKey("SenderId")) message.SenderId = dict["SenderId"] as string;
-                        if (dict.ContainsKey("ReceiverId")) message.ReceiverId = dict["ReceiverId"] as string;
-                        if (dict.ContainsKey("Content")) message.Content = dict["Content"] as string;
-                        if (dict.ContainsKey("MessageType")) message.MessageType = dict["MessageType"] as string;
-                        if (dict.ContainsKey("IsSeen") && dict["IsSeen"] is bool seen) message.IsSeen = seen;
-
-                        // Xử lý Timestamp giống hệt GetMessagesAsync
-                        if (dict.ContainsKey("Timestamp"))
+                        var message = new MessageData
                         {
-                            var tsObj = dict["Timestamp"];
-                            if (tsObj is string tsString)
-                            {
-                                DateTime dt;
-                                if (DateTime.TryParse(tsString, out dt))
-                                {
-                                    message.Timestamp = Timestamp.FromDateTime(dt.ToUniversalTime());
-                                }
-                            }
-                            else if (tsObj is Timestamp ts)
-                            {
+                            MessageId = docChange.Document.Id,
+                            SenderId = dict.TryGetValue("SenderId", out var sid) ? sid as string : null,
+                            ReceiverId = dict.TryGetValue("ReceiverId", out var rid) ? rid as string : null,
+                            Content = dict.TryGetValue("Content", out var content) ? content as string : null,
+                            MessageType = dict.TryGetValue("MessageType", out var type) ? type as string : null,
+                            IsSeen = dict.TryGetValue("IsSeen", out var seenObj) && seenObj is bool seen && seen
+                        };
+
+                        if (dict.TryGetValue("Timestamp", out var tsObj))
+                        {
+                            if (tsObj is Timestamp ts)
                                 message.Timestamp = ts;
-                            }
-                            else
-                            {
-                                message.Timestamp = null;
-                            }
-                        }
-                        else
-                        {
-                            message.Timestamp = null;
+                            else if (tsObj is string tsStr && DateTime.TryParse(tsStr, out var dt))
+                                message.Timestamp = Timestamp.FromDateTime(dt.ToUniversalTime());
                         }
 
                         onMessageReceived?.Invoke(message);
@@ -763,16 +969,19 @@ namespace ChatApp.Services
         }
 
 
-
-
         public async Task StopListeningToMessagesAsync()
         {
             if (_messageListener != null)
             {
-                await _messageListener.StopAsync();
+                try { await _messageListener.StopAsync(); } catch { /* Ignore */ }
                 _messageListener = null;
             }
+
+            _messageListeningCts?.Cancel();
+            _messageListeningCts = null;
+            _activeListeningRoomId = null;
         }
+
 
 
         public async Task<string> CreateGroupAsync(string groupName, string creatorId, List<string> memberIds)

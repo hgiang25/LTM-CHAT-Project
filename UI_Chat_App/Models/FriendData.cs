@@ -13,6 +13,12 @@ namespace ChatApp.Models
 
         [FirestoreProperty]
         public Timestamp AddedAt { get; set; }
+
+        [FirestoreProperty]
+        public int Priority { get; set; } = 0; // Mặc định là 0, cao hơn thì ưu tiên hơn
+
+        [FirestoreProperty]
+        public bool Blocked { get; set; } = false; // ✅ Thêm trường Blocked
     }
 
 }

@@ -351,10 +351,12 @@
     <Compile Include="ChatWindow.xaml.cs">
       <DependentUpon>ChatWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Converters\BlockToVisibilityConverter.cs" />
     <Compile Include="Converters\BooleanConverters.cs" />
     <Compile Include="Converters\MixedItemTemplateSelector .cs" />
     <Compile Include="Converters\HasPendingRequestConverter.cs" />
     <Compile Include="Converters\ImageUrlConverter.cs" />
+    <Compile Include="Converters\PriorityToVisibilityConverter.cs" />
     <Compile Include="Converters\VisualTreeHelperExtensions.cs" />
     <Compile Include="Helpers\ConfigHelper.cs" />
     <Compile Include="Models\CallData.cs">

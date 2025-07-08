@@ -76,5 +76,30 @@ namespace ChatApp.Models
         {
             OnPropertyChanged(propertyName);
         }
+
+        private object _tag;
+
+        public object Tag
+        {
+            get => _tag;
+            set
+            {
+                _tag = value;
+                RaisePropertyChanged(nameof(Tag));
+            }
+        }
+        private bool _isBlocked;
+
+        public bool IsBlocked
+        {
+            get => _isBlocked;
+            set
+            {
+                _isBlocked = value;
+                OnPropertyChanged(nameof(IsBlocked));
+            }
+        }
+
+
     }
 }
