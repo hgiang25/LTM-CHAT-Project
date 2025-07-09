@@ -524,17 +524,17 @@ namespace UI_Chat_App
             }
 
             await _databaseService.StartListeningToMessagesAsync(
-                chatRoomId,
-                message =>
-                {
-                    Dispatcher.Invoke(() =>
-                    {
-                        if (!_messages.Any(m => m.MessageId == message.MessageId))
-                        {
-                            AddMessageToUI(message);
-                        }
-                    });
-                });
+                 chatRoomId,
+                 async message =>
+                 {
+                     await Dispatcher.InvokeAsync(async () =>
+                     {
+                         if (!_messages.Any(m => m.MessageId == message.MessageId))
+                         {
+                             await AddMessageToUI(message);
+                         }
+                     });
+                 });
         }
 
 
@@ -542,7 +542,7 @@ namespace UI_Chat_App
         {
             try
             {
-                if (message == null || _messages.Any(m => m.MessageId == message.MessageId))
+                if (message == null || string.IsNullOrEmpty(message.MessageId) || _messages.Any(m => m.MessageId == message.MessageId))
                     return;
 
                 var isMine = message.SenderId == App.CurrentUser.Id;
@@ -731,7 +731,8 @@ namespace UI_Chat_App
                     Margin = new Thickness(0, 0, 10, 0),
                     VerticalAlignment = VerticalAlignment.Top,
                     Source = (ImageSource)new ImageUrlConverter().Convert(
-                        senderAvatar, typeof(ImageSource), null, null)
+                    string.IsNullOrEmpty(senderAvatar) ? "Icons/user.png" : senderAvatar,
+                    typeof(ImageSource), null, null)
                 };
 
                 // ==== Hiển thị tên người gửi (nếu là nhóm) ====
@@ -848,20 +849,19 @@ namespace UI_Chat_App
             if (messages.Any())
             {
                 _lastMessageTimestamp = messages.Max(m => m.Timestamp); // Use string timestamp
-            }
-
-            Dispatcher.Invoke(() =>
-            {
+            }            
                 foreach (var message in messages.OrderBy(m => m.Timestamp))
                 {
                     if (!_messages.Any(m => m.MessageId == message.MessageId))
                     {
-                        AddMessageToUI(message);
+                        await AddMessageToUI(message);
                     }
                 }
                 MessagesStackPanel.UpdateLayout();
-                MessagesScrollViewer.ScrollToEnd();
-            });
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    MessagesScrollViewer.ScrollToEnd();
+                }), DispatcherPriority.Background);
         }
 
         private UIElement CreateMessageBubble(string text, string time, bool isMine, bool isSeen = false, string messageType = "Text", string fileUrl = null)
@@ -1782,7 +1782,6 @@ namespace UI_Chat_App
         {
             if (sender is Button button && button.DataContext is UserData user)
             {
-                // ✅ Kiểm tra xem bạn có đang bị người đó block không
                 bool theyBlockedMe = await _databaseService.IsBlockingUser(user.Id, App.CurrentUser.Id);
                 if (theyBlockedMe)
                 {
@@ -1800,17 +1799,26 @@ namespace UI_Chat_App
 
                 if (result != MessageBoxResult.Yes) return;
 
-                // ✅ Gọi Firestore để set trạng thái block
+                // ✅ Thay đổi trạng thái block
                 await _databaseService.SetBlockStatusAsync(App.CurrentUser.Id, user.Id, !currentlyBlocking);
 
-                // ✅ Cập nhật trực tiếp vào object gốc để trigger UI update
+                // ✅ Cập nhật UI
                 user.IsBlocked = !currentlyBlocking;
 
                 MessageBox.Show(
                     $"{(currentlyBlocking ? "Đã bỏ chặn" : "Đã chặn")} {user.DisplayName}.",
                     "Thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                // ✅ Gửi tin nhắn hệ thống
+                string chatRoomId = _databaseService.GetChatRoomId(App.CurrentUser.Id, user.Id); // cần có hàm này
+                string systemMessage = currentlyBlocking
+                    ? $"{App.CurrentUser.DisplayName} đã bỏ chặn {user.DisplayName}."
+                    : $"{user.DisplayName} đã bị chặn bởi {App.CurrentUser.DisplayName}.";
+
+                await _databaseService.SendSystemMessageToChatAsync(chatRoomId, systemMessage);
             }
         }
+
 
 
         private void ChatTabButton_Click(object sender, RoutedEventArgs e)

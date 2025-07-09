@@ -178,6 +178,14 @@ namespace ChatApp.Services
             return $"{ids[0]}_{ids[1]}";
         }
 
+        public string GetChatRoomId(string userId1, string userId2)
+        {
+            return string.CompareOrdinal(userId1, userId2) < 0
+                ? $"{userId1}_{userId2}"
+                : $"{userId2}_{userId1}";
+        }
+
+
         public async Task<string> UploadFileToS3Async(string filePath, string folder)
         {
             try
