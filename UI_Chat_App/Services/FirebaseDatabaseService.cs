@@ -730,7 +730,7 @@ namespace ChatApp.Services
         }
 
         private FirestoreChangeListener _friendsListener;
-        public async Task ListenToFriendsAsync(string userId, Action<FriendData> onFriendChanged)
+        public async Task ListenToFriendsAsync(string userId, Action<FriendData, Google.Cloud.Firestore.DocumentChange.Type> onFriendChanged)
         {
             if (_friendsListener != null)
             {
@@ -747,19 +747,17 @@ namespace ChatApp.Services
             {
                 foreach (var change in snapshot.Changes)
                 {
-                    if (change.Document.Exists)
+                    var dict = change.Document.ToDictionary();
+                    var friend = new FriendData
                     {
-                        var dict = change.Document.ToDictionary();
-                        var friend = new FriendData
-                        {
-                            FriendId = change.Document.Id,
-                            Status = dict.TryGetValue("Status", out var s) ? s as string : null,
-                            Blocked = dict.TryGetValue("Blocked", out var b) && b is bool blk && blk,
-                            Priority = dict.TryGetValue("Priority", out var p) && p is int pri ? pri : 0,
-                            AddedAt = dict.TryGetValue("AddedAt", out var t) && t is Timestamp ts ? ts : (Timestamp?)null
-                        };
-                        onFriendChanged?.Invoke(friend);
-                    }
+                        FriendId = change.Document.Id,
+                        Status = dict.TryGetValue("Status", out var s) ? s as string : null,
+                        Blocked = dict.TryGetValue("Blocked", out var b) && b is bool blk && blk,
+                        Priority = dict.TryGetValue("Priority", out var p) && p is int pri ? pri : 0,
+                        AddedAt = dict.TryGetValue("AddedAt", out var t) && t is Timestamp ts ? ts : (Timestamp?)null
+                    };
+                    // Gửi loại thay đổi kèm dữ liệu
+                    onFriendChanged?.Invoke(friend, change.ChangeType);
                 }
             });
         }

@@ -95,11 +95,21 @@ namespace UI_Chat_App
             });
 
             // Lắng nghe thay đổi danh sách bạn bè
-            await _databaseService.ListenToFriendsAsync(App.CurrentUser.Id, friend =>
+            await _databaseService.ListenToFriendsAsync(App.CurrentUser.Id, (friend, changeType) =>
             {
                 Dispatcher.Invoke(() =>
                 {
-                    HandleFriendChanged(friend);
+                    switch (changeType)
+                    {
+                        case Google.Cloud.Firestore.DocumentChange.Type.Added:
+                        case Google.Cloud.Firestore.DocumentChange.Type.Modified:
+                            HandleFriendChanged(friend);
+                            break;
+
+                        case Google.Cloud.Firestore.DocumentChange.Type.Removed:
+                            HandleFriendRemoved(friend);
+                            break;
+                    }
                 });
             });
             try
@@ -279,6 +289,31 @@ namespace UI_Chat_App
 
             // Hiển thị thông báo (tuỳ bạn)
             Console.WriteLine($"🔔 Yêu cầu kết bạn mới từ {request.FromUserId}");
+        }
+
+        private void HandleFriendRemoved(FriendData removedFriend)
+        {
+            var userToRemove = _users.FirstOrDefault(u => u.Id == removedFriend.FriendId);
+            if (userToRemove != null)
+            {
+                _users.Remove(userToRemove);
+                _chatrooms.Remove(userToRemove);
+
+                // Nếu đang chat với người đó thì xóa UI
+                if (_selectedUser?.Id == userToRemove.Id)
+                {
+                    _selectedUser = null;
+                    ChatWithTextBlock.Text = "";
+                    MessagesStackPanel.Children.Clear();
+                    EmptyPromptTextBlock.Visibility = Visibility.Visible;
+                }
+            }
+
+            Dispatcher.Invoke(() =>
+            {
+                UserListBox.ItemsSource = null;
+                UserListBox.ItemsSource = _chatrooms;
+            });
         }
 
 
@@ -1344,23 +1379,33 @@ namespace UI_Chat_App
         }
 
 
-        private void StartListeningToTyping()
+        private async void StartListeningToTyping()
         {
-            // Hủy lắng nghe cũ nếu có
-            _typingStatusListener?.StopAsync();
-            _typingStatusListener = null;
-
-            if (_selectedUser == null || App.CurrentUser == null) return;
-
-            _typingStatusListener = _databaseService.ListenToTypingStatus(App.CurrentUser.Id, _selectedUser.Id, isTyping =>
+            // Dừng lắng nghe cũ nếu có
+            if (_typingStatusListener != null)
             {
-                Dispatcher.Invoke(() =>
+                await _typingStatusListener.StopAsync();
+                _typingStatusListener = null;
+            }
+
+            // Kiểm tra điều kiện trước khi lắng nghe
+            if (_selectedUser == null || App.CurrentUser == null)
+                return;
+
+            // Bắt đầu lắng nghe mới
+            _typingStatusListener = _databaseService.ListenToTypingStatus(
+                App.CurrentUser.Id,
+                _selectedUser.Id,
+                isTyping =>
                 {
-                    TypingStatusTextBlock.Text = isTyping ? $"{_selectedUser.DisplayName} is typing..." : "";
-                    TypingStatusTextBlock.Visibility = isTyping ? Visibility.Visible : Visibility.Collapsed;
+                    Dispatcher.Invoke(() =>
+                    {
+                        TypingStatusTextBlock.Text = isTyping ? $"{_selectedUser.DisplayName} is typing..." : "";
+                        TypingStatusTextBlock.Visibility = isTyping ? Visibility.Visible : Visibility.Collapsed;
+                    });
                 });
-            });
         }
+
 
 
         private async Task SendMessageAsync()
