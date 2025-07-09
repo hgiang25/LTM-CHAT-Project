@@ -694,6 +694,94 @@ namespace ChatApp.Services
             }
         }
 
+        private FirestoreChangeListener _friendRequestListener;
+        public async Task ListenToFriendRequestsAsync(string userId, Action<FriendRequest> onRequestChanged)
+        {
+            if (_friendRequestListener != null)
+            {
+                await _friendRequestListener.StopAsync();
+                _friendRequestListener = null;
+            }
+
+            var requestsRef = _firestoreDb
+                .Collection("users").Document(userId)
+                .Collection("friendRequests")
+                .WhereEqualTo("Status", "pending");
+
+            _friendRequestListener = requestsRef.Listen(snapshot =>
+            {
+                foreach (var change in snapshot.Changes)
+                {
+                    if (change.Document.Exists)
+                    {
+                        var dict = change.Document.ToDictionary();
+                        var request = new FriendRequest
+                        {
+                            RequestId = change.Document.Id,
+                            FromUserId = dict.TryGetValue("FromUserId", out var f) ? f as string : null,
+                            ToUserId = dict.TryGetValue("ToUserId", out var t) ? t as string : null,
+                            Status = dict.TryGetValue("Status", out var s) ? s as string : null,
+                            CreatedAt = dict.TryGetValue("CreatedAt", out var c) && c is Timestamp ts ? ts : (Timestamp?)null
+                        };
+                        onRequestChanged?.Invoke(request);
+                    }
+                }
+            });
+        }
+
+        private FirestoreChangeListener _friendsListener;
+        public async Task ListenToFriendsAsync(string userId, Action<FriendData> onFriendChanged)
+        {
+            if (_friendsListener != null)
+            {
+                await _friendsListener.StopAsync();
+                _friendsListener = null;
+            }
+
+            var friendsRef = _firestoreDb
+                .Collection("users").Document(userId)
+                .Collection("friends")
+                .WhereEqualTo("Status", "accepted");
+
+            _friendsListener = friendsRef.Listen(snapshot =>
+            {
+                foreach (var change in snapshot.Changes)
+                {
+                    if (change.Document.Exists)
+                    {
+                        var dict = change.Document.ToDictionary();
+                        var friend = new FriendData
+                        {
+                            FriendId = change.Document.Id,
+                            Status = dict.TryGetValue("Status", out var s) ? s as string : null,
+                            Blocked = dict.TryGetValue("Blocked", out var b) && b is bool blk && blk,
+                            Priority = dict.TryGetValue("Priority", out var p) && p is int pri ? pri : 0,
+                            AddedAt = dict.TryGetValue("AddedAt", out var t) && t is Timestamp ts ? ts : (Timestamp?)null
+                        };
+                        onFriendChanged?.Invoke(friend);
+                    }
+                }
+            });
+        }
+
+        public async Task StopFriendListenersAsync()
+        {
+            if (_friendRequestListener != null)
+            {
+                await _friendRequestListener.StopAsync();
+                _friendRequestListener = null;
+            }
+
+            if (_friendsListener != null)
+            {
+                await _friendsListener.StopAsync();
+                _friendsListener = null;
+            }
+
+            Console.WriteLine("Stopped listening to friend data");
+        }
+
+
         public async Task<List<NotificationData>> GetNotificationsAsync(string userId)
         {
             try
@@ -876,7 +964,7 @@ namespace ChatApp.Services
         private CancellationTokenSource _messageListeningCts;
         private string _activeListeningRoomId;
 
-        public async Task StartListeningToMessagesAsync(string chatRoomId, Action<MessageData> onMessageReceived)
+        public async Task StartListeningToMessagesAsync(string chatRoomId, Func<MessageData, Task> onMessageReceived)
         {
             // Ngắt lắng nghe trước đó (nếu có)
             if (_messageListener != null)
@@ -916,7 +1004,8 @@ namespace ChatApp.Services
                             ReceiverId = dict.TryGetValue("ReceiverId", out var rid) ? rid as string : null,
                             Content = dict.TryGetValue("Content", out var content) ? content as string : null,
                             MessageType = dict.TryGetValue("MessageType", out var type) ? type as string : null,
-                            IsSeen = dict.TryGetValue("IsSeen", out var seenObj) && seenObj is bool seen && seen
+                            IsSeen = dict.TryGetValue("IsSeen", out var seenObj) && seenObj is bool seen && seen,
+                            FileUrl = dict.TryGetValue("FileUrl", out var fileObj) ? fileObj as string : null
                         };
 
                         if (dict.TryGetValue("Timestamp", out var tsObj))
@@ -927,7 +1016,7 @@ namespace ChatApp.Services
                                 message.Timestamp = Timestamp.FromDateTime(dt.ToUniversalTime());
                         }
 
-                        onMessageReceived?.Invoke(message);
+                        _ = onMessageReceived?.Invoke(message); // không await vì Firestore SDK yêu cầu non-blocking
                     }
                 }
             });

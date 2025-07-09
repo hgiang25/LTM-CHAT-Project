@@ -84,6 +84,24 @@ namespace UI_Chat_App
             await StartListeningForMessages(_currentChatRoomId);
             //await _databaseService.InitializeAllFriendPrioritiesAsync();
             //await _databaseService.AddBlockedFieldToAllFriendsAsync();
+
+            // Lắng nghe yêu cầu kết bạn mới
+            await _databaseService.ListenToFriendRequestsAsync(App.CurrentUser.Id, request =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    HandleFriendRequestChanged(request);
+                });
+            });
+
+            // Lắng nghe thay đổi danh sách bạn bè
+            await _databaseService.ListenToFriendsAsync(App.CurrentUser.Id, friend =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    HandleFriendChanged(friend);
+                });
+            });
             try
             {
                 if (!AgoraService.Instance.Initialize())
@@ -229,6 +247,80 @@ namespace UI_Chat_App
             //await RefreshGroupsAsync();
         }
 
+        private void HandleFriendRequestChanged(FriendRequest request)
+        {
+            if (request == null) return;
+
+            // Kiểm tra đã tồn tại trong danh sách chưa
+            var existing = _friendRequests.FirstOrDefault(r => r.FriendRequest.RequestId == request.RequestId);
+            if (existing == null)
+            {
+                // Lấy thông tin người gửi để hiển thị trong giao diện
+                _ = Dispatcher.Invoke(async () =>
+                {
+                    var sender = await _databaseService.GetUserAsync(request.FromUserId);
+                    if (sender != null)
+                    {
+                        var wrapped = new FriendRequestWithUserInfo
+                        {
+                            FriendRequest = request,
+                            Sender = sender
+                        };
+                        _friendRequests.Add(wrapped);
+                    }
+                });
+            }
+            else
+            {
+                // Cập nhật lại nếu đã có
+                existing.FriendRequest.Status = request.Status;
+                existing.FriendRequest.CreatedAt = request.CreatedAt;
+            }
+
+            // Hiển thị thông báo (tuỳ bạn)
+            Console.WriteLine($"🔔 Yêu cầu kết bạn mới từ {request.FromUserId}");
+        }
+
+
+        private void HandleFriendChanged(FriendData friend)
+        {
+            if (friend == null) return;
+
+            // Kiểm tra có trong danh sách bạn chưa
+            var existing = _users.FirstOrDefault(u => u.Id == friend.FriendId);
+            if (existing == null)
+            {
+                _ = Dispatcher.Invoke(async () =>
+                {
+                    var user = await _databaseService.GetUserAsync(friend.FriendId);
+                    if (user != null)
+                    {
+                        user.Tag = friend.Priority;
+                        user.IsBlocked = friend.Blocked;
+                        if (string.IsNullOrEmpty(user.Avatar))
+                            user.Avatar = "Icons/user.png";
+
+                        _users.Add(user);
+
+                        // Cập nhật lại danh sách phòng chat
+                        _chatrooms.Add(user);
+                    }
+                });
+            }
+            else
+            {
+                existing.IsBlocked = friend.Blocked;
+                existing.Tag = friend.Priority;
+                Console.WriteLine($"🔁 Cập nhật bạn: {friend.FriendId}");
+            }
+
+            // Làm mới UI nếu cần
+            Dispatcher.Invoke(() =>
+            {
+                if (UserListBox.ItemsSource != _chatrooms)
+                    UserListBox.ItemsSource = _chatrooms;
+            });
+        }
 
         private async Task RefreshFriendsAndRequestsAsync()
         {
@@ -524,17 +616,17 @@ namespace UI_Chat_App
             }
 
             await _databaseService.StartListeningToMessagesAsync(
-                 chatRoomId,
-                 async message =>
-                 {
-                     await Dispatcher.InvokeAsync(async () =>
-                     {
-                         if (!_messages.Any(m => m.MessageId == message.MessageId))
-                         {
-                             await AddMessageToUI(message);
-                         }
-                     });
-                 });
+                chatRoomId,
+                async message =>
+                {
+                    await Dispatcher.InvokeAsync(async () =>
+                    {
+                        if (!_messages.Any(m => m.MessageId == message.MessageId))
+                        {
+                            await AddMessageToUI(message);
+                        }
+                    });
+                });
         }
 
 
@@ -611,24 +703,49 @@ namespace UI_Chat_App
                     case "Voice":
                         if (string.IsNullOrEmpty(message.FileUrl))
                         {
+                            Debug.WriteLine($"⛔ Voice message không khả dụng. FileUrl: {message.FileUrl ?? "null"}");
                             stack.Children.Add(new TextBlock { Text = "Lỗi: Tin nhắn thoại không khả dụng" });
                             break;
                         }
 
-                        string tempFile = await DownloadToTempFileAsync(message.FileUrl, "wav");
-                        if (string.IsNullOrEmpty(tempFile))
+                        var loadingText = new TextBlock
                         {
-                            stack.Children.Add(new TextBlock { Text = "Lỗi: Không tải được tin nhắn thoại" });
+                            Text = "Đang tải tin nhắn thoại...",
+                            FontStyle = FontStyles.Italic,
+                            Foreground = Brushes.Gray
+                        };
+                        stack.Children.Add(loadingText);
+
+                        string voicePath = null;
+
+                        // 👇 Retry tối đa 3 lần với delay 1s giữa mỗi lần
+                        for (int attempt = 0; attempt < 3; attempt++)
+                        {
+                            voicePath = await DownloadToTempFileAsync(message.FileUrl, "wav");
+                            if (!string.IsNullOrEmpty(voicePath)) break;
+                            await Task.Delay(1000); // đợi 1 giây rồi thử lại
+                        }
+
+                        stack.Children.Remove(loadingText);
+
+                        if (string.IsNullOrEmpty(voicePath))
+                        {
+                            stack.Children.Add(new TextBlock
+                            {
+                                Text = "Không thể tải tin nhắn thoại. Vui lòng thử lại sau.",
+                                Foreground = Brushes.Red,
+                                FontSize = 12
+                            });
                             break;
                         }
 
-                        var playButton = new Button
+                        var playVoiceButton = new Button
                         {
                             Content = "Phát tin nhắn thoại",
-                            Tag = tempFile,
+                            Tag = voicePath,
                             Margin = new Thickness(5)
                         };
-                        playButton.Click += (s, e) =>
+                        playVoiceButton.Click += (s, e) =>
                         {
                             try
                             {
@@ -648,7 +765,8 @@ namespace UI_Chat_App
                                 MessageBox.Show($"Không thể phát tin nhắn thoại: {ex.Message}");
                             }
                         };
-                        stack.Children.Add(playButton);
+
+                        stack.Children.Add(playVoiceButton);
                         break;
 
                     case "Emoji":
@@ -822,22 +940,33 @@ namespace UI_Chat_App
         }
 
 
-        private async Task<string> DownloadToTempFileAsync(string url, string extension)
+        private async Task<string> DownloadToTempFileAsync(string url, string extension, int retryCount = 2)
         {
             if (string.IsNullOrEmpty(url)) return null;
 
-            try
+            for (int attempt = 0; attempt <= retryCount; attempt++)
             {
-                var tempPath = Path.Combine(Path.GetTempPath(), $"chat_{Guid.NewGuid()}.{extension}");
-                var client = new WebClient();
-                await client.DownloadFileTaskAsync(url, tempPath);
-                return tempPath;
+                try
+                {
+                    var tempPath = Path.Combine(Path.GetTempPath(), $"chat_{Guid.NewGuid().ToString()}.{extension}");
+
+                    using (var client = new WebClient())
+                    {
+                        await client.DownloadFileTaskAsync(new Uri(url), tempPath);
+                    }
+
+                    return tempPath;
+                }
+                catch
+                {
+                    if (attempt < retryCount)
+                        await Task.Delay(1000); // đợi 1 giây rồi thử lại
+                }
             }
-            catch
-            {
-                return null;
-            }
+
+            return null;
         }
+
 
 
 
@@ -1337,6 +1466,7 @@ namespace UI_Chat_App
                     await _typingStatusListener.StopAsync();
                     _typingStatusListener = null;
                 }
+                await _databaseService.StopFriendListenersAsync();
                 //await _databaseService.StopListeningToUserGroupsAsync();
 
             }
@@ -1408,6 +1538,12 @@ namespace UI_Chat_App
                     Console.WriteLine($"Set IsOnline = false for user {App.CurrentUser.Id} on logout.");
                 }
                 await _databaseService.StopListeningForNotificationsAsync();
+                if (_typingStatusListener != null)
+                {
+                    await _typingStatusListener.StopAsync();
+                    _typingStatusListener = null;
+                }
+                await _databaseService.StopFriendListenersAsync();
                 //await _databaseService.StopListeningToUserGroupsAsync();
                 // Đóng cửa sổ hiện tại và mở lại cửa sổ đăng nhập
                 var mainWindow = new MainWindow(); // Đã sửa từ LoginWindow thành MainWindow
@@ -2016,18 +2152,20 @@ namespace UI_Chat_App
                     return;
                 }
 
-                var timestamp = Timestamp.GetCurrentTimestamp();
                 var message = new MessageData
                 {
                     SenderId = App.CurrentUser.Id,
                     ReceiverId = _selectedUser?.Id,
-                    Content = "Đã gửi một tin nhắn thoại",
-                    Timestamp = timestamp,
+                    Content = "[Voice]",
+                    Timestamp = Timestamp.GetCurrentTimestamp(),
                     MessageType = "Voice",
-                    FileUrl = voiceUrl
+                    FileUrl = voiceUrl,
+                    IsSeen = false
                 };
-                AddMessageToUI(message);
+
+                // ❌ KHÔNG gọi AddMessageToUI ở đây
                 await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
+
                 File.Delete(tempFilePath);
                 AttachOptionsPanel.Visibility = Visibility.Collapsed;
 
@@ -2041,6 +2179,9 @@ namespace UI_Chat_App
                 MessageBox.Show($"Gửi tin nhắn thoại thất bại: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+
+
 
 
         private void LikeButton_Click(object sender, RoutedEventArgs e)

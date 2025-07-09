@@ -12,7 +12,7 @@ namespace ChatApp.Models
         public string Status { get; set; } // "accepted", "pending"
 
         [FirestoreProperty]
-        public Timestamp AddedAt { get; set; }
+        public Timestamp? AddedAt { get; set; }
 
         [FirestoreProperty]
         public int Priority { get; set; } = 0; // Mặc định là 0, cao hơn thì ưu tiên hơn

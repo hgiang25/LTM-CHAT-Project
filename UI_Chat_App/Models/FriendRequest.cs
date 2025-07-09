@@ -18,6 +18,6 @@ namespace ChatApp.Models
         public string Status { get; set; } // "pending", "accepted", "rejected"
 
         [FirestoreProperty]
-        public Timestamp CreatedAt { get; set; }
+        public Timestamp? CreatedAt { get; set; }
     }
 }
