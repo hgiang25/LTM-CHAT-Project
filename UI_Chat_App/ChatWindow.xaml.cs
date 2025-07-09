@@ -80,6 +80,11 @@ namespace UI_Chat_App
             await InitializeChatAsync();
             //_refreshTimer.Start();
             EmptyPromptTextBlock.Visibility = Visibility.Visible;
+            UserProfilePanel.Visibility = Visibility.Visible;
+            UserProfileColumn.Width = new GridLength(230); // Hiển thị cột profile
+            EditUsernameButton.Visibility = Visibility.Visible;
+            UpdateUserProfile(App.CurrentUser);
+
 
             await StartListeningForMessages(_currentChatRoomId);
             //await _databaseService.InitializeAllFriendPrioritiesAsync();
@@ -963,6 +968,7 @@ namespace UI_Chat_App
             // Hiển thị user profile
             UserProfilePanel.Visibility = Visibility.Visible;
             UserProfileColumn.Width = new GridLength(230); // Hiển thị cột profile
+            EditUsernameButton.Visibility = Visibility.Visible;
 
             // Cập nhật dữ liệu cho profile của user hiện tại
             UpdateUserProfile(App.CurrentUser);
@@ -1029,6 +1035,8 @@ namespace UI_Chat_App
 
         private async void UserListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            EditUsernameButton.Visibility = Visibility.Collapsed;
+
             var selectedItem = UserListBox.SelectedItem;
 
             if (selectedItem is UserData newSelectedUser)
@@ -1712,7 +1720,7 @@ namespace UI_Chat_App
         private async void CreateGroupButton_Click(object sender, RoutedEventArgs e)
         {
             var groupName = GroupNameTextBox.Text.Trim();
-            if (string.IsNullOrWhiteSpace(groupName))
+            if (string.IsNullOrWhiteSpace(groupName) || groupName == "Group Name...")
             {
                 MessageBox.Show("Vui lòng nhập tên nhóm.");
                 return;
@@ -2844,6 +2852,40 @@ namespace UI_Chat_App
                 Console.WriteLine($"Lỗi khi bắt đầu cuộc gọi: {ex.Message}");
                 MessageBox.Show($"Không thể bắt đầu cuộc gọi. Vui lòng kiểm tra kết nối mạng và thử lại.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private void EditGroupAvatarButton_Click(object sender, RoutedEventArgs e)
+        {
+
+        }
+
+        private void EditGroupNameButton_Click(object sender, RoutedEventArgs e)
+        {
+
+        }
+        
+        private void GroupnameEditTextBox_KeyDown(object sender, KeyEventArgs e)
+        {
+
+        }
+        
+        private void GroupnameEditTextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+
+        }
+        private void EditUsernameButton_Click(object sender, RoutedEventArgs e)
+        {
+
+        }
+
+        private void UsernameEditTextBox_KeyDown(object sender, KeyEventArgs e)
+        {
+
+        }
+
+        private void UsernameEditTextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+
         }
     }
 }
