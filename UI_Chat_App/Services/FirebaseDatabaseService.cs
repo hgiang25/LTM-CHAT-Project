@@ -104,69 +104,26 @@ namespace ChatApp.Services
         {
             try
             {
-                var messagesRef = _firestoreDb
+                CollectionReference messagesRef = _firestoreDb
                     .Collection("messages")
                     .Document(chatRoomId)
                     .Collection("messages");
-
-                Query query = messagesRef.OrderBy("Timestamp");
-
-                if (lastTimestamp != null)
-                {
-                    query = query.WhereGreaterThan("Timestamp", lastTimestamp);
-                }
-
-                var snapshot = await query.GetSnapshotAsync();
+                QuerySnapshot snapshot = await messagesRef.OrderBy("Timestamp").GetSnapshotAsync();
                 var messages = snapshot.Documents
-                .Select(doc =>
-                {
-                    var dict = doc.ToDictionary();
-
-                    var message = new MessageData();
-                    message.MessageId = doc.Id;
-
-                    // Lấy các trường cơ bản
-                    if (dict.TryGetValue("SenderId", out var senderId)) message.SenderId = senderId as string;
-                    if (dict.TryGetValue("ReceiverId", out var receiverId)) message.ReceiverId = receiverId as string;
-                    if (dict.TryGetValue("Content", out var content)) message.Content = content as string;
-                    if (dict.TryGetValue("MessageType", out var messageType)) message.MessageType = messageType as string;
-                    if (dict.TryGetValue("IsSeen", out var isSeen)) message.IsSeen = (bool)isSeen;
-
-                    // Xử lý trường Timestamp
-                    if (dict.TryGetValue("Timestamp", out var timestampObj))
+                    .Select(doc =>
                     {
-                        if (timestampObj is string tsString)
-                        {
-                            // Chuyển string sang DateTime rồi sang Timestamp
-                            var dt = DateTime.Parse(tsString).ToUniversalTime();
-                            message.Timestamp = Google.Cloud.Firestore.Timestamp.FromDateTime(dt);
-                        }
-                        else if (timestampObj is Google.Cloud.Firestore.Timestamp ts)
-                        {
-                            message.Timestamp = ts;
-                        }
-                        else
-                        {
-                            // Trường hợp khác (nếu có)
-                            message.Timestamp = null; // hoặc xử lý phù hợp
-                        }
-                    }
-                    else
-                    {
-                        message.Timestamp = null; // Hoặc default value
-                    }
-
-                    return message;
-                })
-                .OrderBy(m => m.Timestamp?.ToDateTime() ?? DateTime.MinValue)
-                .ToList();
-
-
+                        var message = doc.ConvertTo<MessageData>();
+                        message.MessageId = doc.Id; // Assign MessageId from document ID
+                        return message;
+                    })
+                    .OrderBy(m => m.Timestamp?.ToDateTime()) // Convert Timestamp? to DateTime for ordering
+                    .ToList();
+                Console.WriteLine($"Loaded {messages.Count} messages for chat room {chatRoomId}");
                 return messages;
             }
             catch (Exception ex)
             {
-                throw new Exception($"Failed to get messages: {ex.Message}", ex);
+                throw new Exception($"Failed to get messages for chat room {chatRoomId}: {ex.Message}", ex);
             }
         }
 

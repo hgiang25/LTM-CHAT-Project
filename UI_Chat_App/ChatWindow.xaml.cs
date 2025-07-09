@@ -78,7 +78,9 @@ namespace UI_Chat_App
         private async void ChatWindow_Loaded(object sender, RoutedEventArgs e)
         {
             await InitializeChatAsync();
-            //_refreshTimer.Start();                     
+            //_refreshTimer.Start();
+            EmptyPromptTextBlock.Visibility = Visibility.Visible;
+
             await StartListeningForMessages(_currentChatRoomId);
             //await _databaseService.InitializeAllFriendPrioritiesAsync();
             //await _databaseService.AddBlockedFieldToAllFriendsAsync();
@@ -565,21 +567,21 @@ namespace UI_Chat_App
 
                     case "Image":
                         var image = new Image
-                        {
-                            Width = 200,
-                            Height = 200,
-                            Stretch = Stretch.UniformToFill,
-                            Margin = new Thickness(0, 0, 0, 5)
-                        };
-                        var binding = new Binding("FileUrl")
-                        {
-                            Source = message,
-                            Converter = (IValueConverter)FindResource("ImageUrlConverter"),
-                            FallbackValue = new BitmapImage(new Uri("pack://application:,,,/Icons/user.png"))
-                        };
-                        image.SetBinding(Image.SourceProperty, binding);
-                        stack.Children.Add(image);
+                                {
+                                    Width = 200,
+                                    Height = 200,
+                                    HorizontalAlignment = message.SenderId == App.CurrentUser.Id ? HorizontalAlignment.Right : HorizontalAlignment.Left
+                                };
+                                var binding = new Binding("FileUrl")
+                                {
+                                    Source = message,
+                                    Converter = (IValueConverter)FindResource("ImageUrlConverter"),
+                                    FallbackValue = new BitmapImage(new Uri("pack://application:,,,/Icons/user.png", UriKind.Absolute))
+                                };
+                                image.SetBinding(Image.SourceProperty, binding);
+                                stack.Children.Add(image);
                         break;
+
 
                     case "File":
                         if (string.IsNullOrEmpty(message.FileUrl) || !Uri.TryCreate(message.FileUrl, UriKind.Absolute, out var fileUri))
@@ -1031,6 +1033,8 @@ namespace UI_Chat_App
 
             if (selectedItem is UserData newSelectedUser)
             {
+                EmptyPromptTextBlock.Visibility = Visibility.Collapsed;
+
                 // --- Xử lý chat cá nhân ---
                 if ((newSelectedUser != _selectedUser && newSelectedUser != null) || _currentChatRoomId == null)
                 {
@@ -1070,6 +1074,8 @@ namespace UI_Chat_App
             }
             else if (selectedItem is GroupData selectedGroup)
             {
+                EmptyPromptTextBlock.Visibility = Visibility.Collapsed;
+
                 // --- Xử lý chat nhóm ---                
                 _selectedGroup = await _databaseService.GetGroupAsync(selectedGroup.GroupId);
                 //_selectedGroup = selectedGroup;
@@ -1145,6 +1151,7 @@ namespace UI_Chat_App
             // Ẩn cả hai profile panel
             UserProfilePanel.Visibility = Visibility.Collapsed;
             GroupProfilePanel.Visibility = Visibility.Collapsed;
+            EmptyPromptTextBlock.Visibility = Visibility.Visible;
 
             //// 👉 Reset UI liên quan đến nhóm
             //GroupMembersList.ItemsSource = null;
@@ -1851,15 +1858,7 @@ namespace UI_Chat_App
             SearchBoxContainer.Visibility = isSearchVisible ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        private void VoiceCallButton_Click(object sender, RoutedEventArgs e)
-        {
-            // Code xử lý khi nhấn nút gọi thoại
-        }
-
-        private void VideoCallButton_Click(object sender, RoutedEventArgs e)
-        {
-            // Code xử lý khi nhấn nút gọi video
-        }
+        
 
         private void AttachButton_Click(object sender, RoutedEventArgs e)
         {
@@ -1896,15 +1895,17 @@ namespace UI_Chat_App
                     var message = new MessageData
                     {
                         SenderId = App.CurrentUser.Id,
-                        ReceiverId = _selectedUser.Id,
+                        ReceiverId = _selectedUser?.Id,
                         Content = "Đã gửi một ảnh",
                         Timestamp = timestamp,
                         MessageType = "Image",
                         FileUrl = imageUrl
-                    };
+                    };                    
+                    await AddMessageToUI(message);
 
-                    AddMessageToUI(message);
-                    await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
+
+                    await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);  
+
                     AttachOptionsPanel.Visibility = Visibility.Collapsed;
 
                     if (_selectedUser != null)
@@ -1951,7 +1952,7 @@ namespace UI_Chat_App
                     var message = new MessageData
                     {
                         SenderId = App.CurrentUser.Id,
-                        ReceiverId = _selectedUser.Id,
+                        ReceiverId = _selectedUser?.Id,
                         Content = $"Đã gửi file: {fileName}",
                         Timestamp = timestamp,
                         MessageType = "File",
@@ -2011,7 +2012,7 @@ namespace UI_Chat_App
                 var message = new MessageData
                 {
                     SenderId = App.CurrentUser.Id,
-                    ReceiverId = _selectedUser.Id,
+                    ReceiverId = _selectedUser?.Id,
                     Content = "Đã gửi một tin nhắn thoại",
                     Timestamp = timestamp,
                     MessageType = "Voice",
