@@ -87,6 +87,7 @@ namespace UI_Chat_App
 
 
             await StartListeningForMessages(_currentChatRoomId);
+            StartListeningToAllGroupChanges();
             //await _databaseService.InitializeAllFriendPrioritiesAsync();
             //await _databaseService.AddBlockedFieldToAllFriendsAsync();
 
@@ -1528,6 +1529,7 @@ namespace UI_Chat_App
                     Console.WriteLine($"Set IsOnline = false for user {App.CurrentUser.Id} on window closing.");
                 }
                 await _databaseService.StopListeningForNotificationsAsync();
+                await _databaseService.StopListeningToUserRelatedGroupsAsync();
                 if (_typingStatusListener != null)
                 {
                     await _typingStatusListener.StopAsync();
@@ -1605,6 +1607,7 @@ namespace UI_Chat_App
                     Console.WriteLine($"Set IsOnline = false for user {App.CurrentUser.Id} on logout.");
                 }
                 await _databaseService.StopListeningForNotificationsAsync();
+                await _databaseService.StopListeningToUserRelatedGroupsAsync();
                 if (_typingStatusListener != null)
                 {
                     await _typingStatusListener.StopAsync();
@@ -2521,10 +2524,66 @@ namespace UI_Chat_App
             _typingTimer.Start();
         }
 
+        private async void StartListeningToAllGroupChanges()
+        {
+            // Ngắt các listener cũ
+            await _databaseService.StopListeningToUserRelatedGroupsAsync();
+            await _databaseService.StopListeningToEachUserGroupAsync();
+
+            // 1. Bước đầu: lắng nghe danh sách nhóm của user (thêm/xoá)
+            _databaseService.ListenToUserRelatedGroupsAsync(App.CurrentUser.Id, async updatedGroups =>
+            {
+                await Dispatcher.InvokeAsync(async () =>
+                {
+                    // Cập nhật danh sách nhóm hiển thị
+                    _groups.Clear();
+                    foreach (var group in updatedGroups)
+                        _groups.Add(group);
+                    UpdateChatroomList();
+
+                    // 2. Với danh sách nhóm hiện tại => lắng nghe từng group cụ thể
+                    var groupIds = updatedGroups.Select(g => g.GroupId).ToList();
+                    await _databaseService.ListenToEachUserGroupAsync(groupIds, updatedGroup =>
+                    {
+                        Dispatcher.Invoke(() =>
+                        {
+                            var index = _groups.ToList().FindIndex(g => g.GroupId == updatedGroup.GroupId);
+                            if (index >= 0)
+                            {
+                                _groups[index] = updatedGroup;
+                            }
+                            else
+                            {
+                                _groups.Add(updatedGroup);
+                            }
+
+                            UpdateChatroomList();
+
+                            if (_selectedGroup?.GroupId == updatedGroup.GroupId)
+                            {
+                                _selectedGroup = updatedGroup;
+                                _ = RefreshGroupUIAsync();
+                                UpdateGroupMemberCount();
+                            }
+                        });
+                    });
+                });
+            });
+        }
+
+
+
+
         private async Task RefreshGroupUIAsync()
         {
             // 1. Lấy lại dữ liệu nhóm
-            _selectedGroup = await _databaseService.GetGroupAsync(_selectedGroup.GroupId);
+            if (_selectedGroup == null)
+            {
+                Console.WriteLine("⚠️ _selectedGroup is null, skipping RefreshGroupUIAsync.");
+                return;
+            }
+
+            _selectedGroup = await _databaseService.GetGroupAsync(_selectedGroup.GroupId);            
 
             // 2. Cập nhật danh sách thành viên
             var memberIds = _selectedGroup.Members?.Keys.ToList() ?? new List<string>();
@@ -2569,9 +2628,16 @@ namespace UI_Chat_App
 
         private void UpdateGroupMemberCount()
         {
-            int memberCount = _selectedGroup.Members?.Count ?? 0;
+            if (_selectedGroup?.Members == null)
+            {
+                GroupMemberCount.Text = "Members: 0 members";
+                return;
+            }
+
+            int memberCount = _selectedGroup.Members.Count;
             GroupMemberCount.Text = $"Members: {memberCount} members";
         }
+
 
 
         private void ToggleVisibility(UIElement element, bool visible)
@@ -2955,36 +3021,7 @@ namespace UI_Chat_App
             {
                 MessageBox.Show("Lỗi khi xóa nhóm: " + ex.Message);
             }
-        }
-
-
-        private async void StartListeningToUserGroups()
-        {
-            await _databaseService.StopListeningToUserGroupsAsync();
-
-            _databaseService.ListenToUserGroups(App.CurrentUser.Id, async groups =>
-            {
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    // ✅ Tránh Clear() nếu dữ liệu mới là rỗng và cũ đang có
-                    if (groups.Count == 0 && _groups.Count > 0)
-                    {
-                        Console.WriteLine("⚠️ Snapshot trả về rỗng, giữ nguyên danh sách nhóm cũ.");
-                        return;
-                    }
-
-                    // ✅ Cập nhật nếu có thay đổi thật sự
-                    if (!_groups.SequenceEqual(groups, new GroupDataComparer()))
-                    {
-                        _groups.Clear();
-                        foreach (var group in groups)
-                            _groups.Add(group);
-
-                        UpdateChatroomList();
-                    }
-                });
-            });
-        }
+        }        
 
 
 

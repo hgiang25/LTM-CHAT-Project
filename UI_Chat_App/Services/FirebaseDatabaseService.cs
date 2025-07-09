@@ -1127,9 +1127,9 @@ namespace ChatApp.Services
                         result.Add(key);
                 }
 
-                if (doc.ContainsField("pending members"))
+                if (doc.ContainsField("pendingMembers"))
                 {
-                    var pendingMap = doc.GetValue<Dictionary<string, object>>("pending members");
+                    var pendingMap = doc.GetValue<Dictionary<string, object>>("pendingMembers");
                     foreach (var key in pendingMap.Keys)
                         result.Add(key);
                 }
@@ -1142,9 +1142,9 @@ namespace ChatApp.Services
         public async Task<List<string>> GetGroupPendingMembersAsync(string groupId)
         {
             var doc = await _firestoreDb.Collection("groups").Document(groupId).GetSnapshotAsync();
-            if (doc.Exists && doc.ContainsField("pending members"))
+            if (doc.Exists && doc.ContainsField("pendingMembers"))
             {
-                var pendingMap = doc.GetValue<Dictionary<string, object>>("pending members");
+                var pendingMap = doc.GetValue<Dictionary<string, object>>("pendingMembers");
                 return pendingMap.Keys.ToList();
             }
             return new List<string>();
@@ -1233,8 +1233,8 @@ namespace ChatApp.Services
                 ? groupSnap.GetValue<Dictionary<string, object>>("members").ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString())
                 : new Dictionary<string, string>();
 
-            var pendingMembers = groupSnap.ContainsField("pending members")
-                ? groupSnap.GetValue<Dictionary<string, object>>("pending members").ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString())
+            var pendingMembers = groupSnap.ContainsField("pendingMembers")
+                ? groupSnap.GetValue<Dictionary<string, object>>("pendingMembers").ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString())
                 : new Dictionary<string, string>();
 
             // Nếu đã là thành viên => không làm gì
@@ -1262,12 +1262,12 @@ namespace ChatApp.Services
                 var updates = new Dictionary<string, object>
                 {
                     { "members", members },
-                    { "pending members", pendingMembers },
+                    { "pendingMembers", pendingMembers },
                     { "memberCount", members.Count }
                 };
 
                 await groupRef.UpdateAsync(updates);
-                SendSystemMessageToChatAsync(groupId, $"👥 {Inviter.DisplayName} đã thêm {TargetUser.DisplayName} vào nhóm.");
+                await SendSystemMessageToChatAsync(groupId, $"👥 {Inviter.DisplayName} đã thêm {TargetUser.DisplayName} vào nhóm.");
             }
             else
             {
@@ -1277,8 +1277,8 @@ namespace ChatApp.Services
 
                 pendingMembers[targetUserId] = "invited";
 
-                await groupRef.UpdateAsync("pending members", pendingMembers);
-                SendSystemMessageToChatAsync(groupId, $"👥 {Inviter.DisplayName} đã mời {TargetUser.DisplayName} tham gia nhóm.");
+                await groupRef.UpdateAsync("pendingMembers", pendingMembers);
+                await SendSystemMessageToChatAsync(groupId, $"👥 {Inviter.DisplayName} đã mời {TargetUser.DisplayName} tham gia nhóm.");
             }
         }
 
@@ -1328,8 +1328,8 @@ namespace ChatApp.Services
             var members = snapshot.GetValue<Dictionary<string, object>>("members")
                 .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString());
 
-            var pendingMembers = snapshot.ContainsField("pending members")
-                ? snapshot.GetValue<Dictionary<string, object>>("pending members").ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString())
+            var pendingMembers = snapshot.ContainsField("pendingMembers")
+                ? snapshot.GetValue<Dictionary<string, object>>("pendingMembers").ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString())
                 : new Dictionary<string, string>();
 
             if (!pendingMembers.ContainsKey(userId))
@@ -1342,7 +1342,7 @@ namespace ChatApp.Services
             await groupRef.UpdateAsync(new Dictionary<string, object>
             {
                 { "members", members },
-                { "pending members", pendingMembers },
+                { "pendingMembers", pendingMembers },
                 { "memberCount", members.Count }
             });
         }
@@ -1381,9 +1381,9 @@ namespace ChatApp.Services
             }
 
             // Xử lý trường "pending members"
-            if (snapshot.ContainsField("pending members"))
+            if (snapshot.ContainsField("pendingMembers"))
             {
-                var pendingMap = snapshot.GetValue<Dictionary<string, object>>("pending members");
+                var pendingMap = snapshot.GetValue<Dictionary<string, object>>("pendingMembers");
                 groupData.PendingMembers = pendingMap.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString());
                 Console.WriteLine($"[DEBUG] Loaded pending members: {string.Join(", ", groupData.PendingMembers.Select(kvp => $"{kvp.Key}: {kvp.Value}"))}");
             }
@@ -1431,7 +1431,8 @@ namespace ChatApp.Services
                     throw new Exception("Nhóm không tồn tại.");
 
                 var data = snapshot.ToDictionary();
-                var members = data["members"] as Dictionary<string, object>;
+                var rawMembers = snapshot.GetValue<Dictionary<string, object>>("members");
+                var members = rawMembers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString());
 
                 if (!members.ContainsKey(oldAdminId))
                     throw new Exception("Admin cũ không tồn tại."); // Lỗi nằm ở đây nếu bạn đã xoá trước
@@ -1444,55 +1445,12 @@ namespace ChatApp.Services
 
                 transaction.Update(groupRef, new Dictionary<string, object>
         {
-            { "members", members },
-            { "createdBy", newAdminId }
-        });
+                    { "members", members },
+                    { "createdBy", newAdminId },
+                    { "memberCount", members.Count }
+                });
             });
-        }
-
-        private FirestoreChangeListener _userGroupsListener;
-
-        public void ListenToUserGroups(string userId, Action<List<GroupData>> onGroupsChanged)
-        {
-            var groupsRef = _firestoreDb.Collection("groups");
-
-            // Lắng nghe mọi thay đổi trong tập hợp nhóm
-            _userGroupsListener = groupsRef.Listen(snapshot =>
-            {
-                Console.WriteLine($"📥 Received group snapshot: {snapshot.Documents.Count} documents");
-
-                var userGroups = new List<GroupData>();
-
-                foreach (var doc in snapshot.Documents)
-                {
-                    if (doc.Exists)
-                    {
-                        var group = doc.ConvertTo<GroupData>();
-
-                        if (group.Members != null)
-                            Console.WriteLine($"✅ Group: {group.GroupId} | Members: {string.Join(",", group.Members.Keys)}");
-
-                        if (group.Members != null && group.Members.ContainsKey(userId))
-                        {
-                            userGroups.Add(group);
-                        }
-                    }
-                }
-
-                Console.WriteLine($"✅ User {userId} belongs to {userGroups.Count} groups");
-                onGroupsChanged?.Invoke(userGroups);
-            });
-
-        }
-
-        public async Task StopListeningToUserGroupsAsync()
-        {
-            if (_userGroupsListener != null)
-            {
-                await _userGroupsListener.StopAsync();
-                _userGroupsListener = null;
-            }
-        }
+        }      
 
         public async Task SendSystemMessageToChatAsync(string chatRoomId, string content)
         {
@@ -1510,37 +1468,137 @@ namespace ChatApp.Services
         }
 
 
+        private Dictionary<string, FirestoreChangeListener> _individualGroupListeners = new Dictionary<string, FirestoreChangeListener>();
+
+        public async Task ListenToEachUserGroupAsync(List<string> groupIds, Action<GroupData> onGroupChanged)
+        {
+            // Stop previous listeners
+            foreach (var listener in _individualGroupListeners.Values)
+                await listener.StopAsync();
+
+            _individualGroupListeners.Clear();
+
+            foreach (var groupId in groupIds)
+            {
+                var docRef = _firestoreDb.Collection("groups").Document(groupId);
+                var listener = docRef.Listen(snapshot =>
+                {
+                    if (!snapshot.Exists) return;
+
+                    var data = snapshot.ToDictionary();
+
+                    var members = snapshot.ContainsField("members")
+                        ? snapshot.GetValue<Dictionary<string, object>>("members")
+                        : new Dictionary<string, object>();
+
+                    var pending = snapshot.ContainsField("pending members")
+                        ? snapshot.GetValue<Dictionary<string, object>>("pending members")
+                        : new Dictionary<string, object>();
+
+                    Timestamp createdAt = Timestamp.FromDateTime(DateTime.UtcNow);
+                    if (data.ContainsKey("createdAt") && data["createdAt"] is Timestamp ts)
+                        createdAt = ts;
+
+                    var group = new GroupData
+                    {
+                        GroupId = snapshot.Id,
+                        Name = data.ContainsKey("name") ? data["name"]?.ToString() : "[No Name]",
+                        Avatar = data.ContainsKey("avatar") ? data["avatar"]?.ToString() : "Icons/group.png",
+                        CreatedBy = data.ContainsKey("createdBy") ? data["createdBy"]?.ToString() : "",
+                        CreatedAt = createdAt,
+                        MemberCount = data.ContainsKey("memberCount") ? Convert.ToInt32(data["memberCount"]) : 0,
+                        Members = members.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString()),
+                        PendingMembers = pending.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString())
+                    };
+
+                    onGroupChanged?.Invoke(group);
+                });
+
+                _individualGroupListeners[groupId] = listener;
+            }
+        }
+
+        public async Task StopListeningToEachUserGroupAsync()
+        {
+            foreach (var listener in _individualGroupListeners.Values)
+                await listener.StopAsync();
+            _individualGroupListeners.Clear();
+        }
 
 
-        //private FirestoreChangeListener _groupMessageListener;
+        private FirestoreChangeListener _groupChangeListener;
 
-        //public void ListenToGroupMessages(string groupId, Action<MessageData> onMessageReceived)
-        //{
-        //    var messagesRef = _firestoreDb
-        //        .Collection("groups")
-        //        .Document(groupId)
-        //        .Collection("messages")
-        //        .OrderBy("timestamp");
+        public async Task ListenToUserRelatedGroupsAsync(string userId, Action<List<GroupData>> onGroupsChanged)
+        {
+            // Ngừng listener cũ nếu có
+            if (_groupChangeListener != null)
+            {
+                await _groupChangeListener.StopAsync();
+                _groupChangeListener = null;
+            }
 
-        //    _groupMessageListener = messagesRef.Listen(snapshot =>
-        //    {
-        //        foreach (var change in snapshot.Changes)
-        //        {
-        //            if (change.ChangeType == Google.Cloud.Firestore.DocumentChange.Type.Added)
-        //            {
-        //                var message = change.Document.ConvertTo<MessageData>();
-        //                onMessageReceived?.Invoke(message); // Cập nhật UI
-        //            }
-        //        }
-        //    });
-        //}
+            var groupsRef = _firestoreDb.Collection("groups");
 
-        //// Gọi khi rời nhóm hoặc đổi nhóm
-        //public void StopListeningToMessages()
-        //{
-        //    _groupMessageListener?.StopAsync();
-        //    _groupMessageListener = null;
-        //}
+            _groupChangeListener = groupsRef.Listen(async snapshot =>
+            {
+                var updatedGroups = new List<GroupData>();
+
+                foreach (var doc in snapshot.Documents)
+                {
+                    if (!doc.Exists) continue;
+
+                    var data = doc.ToDictionary();
+
+                    // Lọc nhóm có liên quan đến userId (member hoặc pending)
+                    var members = doc.ContainsField("members")
+                        ? doc.GetValue<Dictionary<string, object>>("members")
+                        : new Dictionary<string, object>();
+
+                    var pending = doc.ContainsField("pendingMembers")
+                        ? doc.GetValue<Dictionary<string, object>>("pendingMembers")
+                        : new Dictionary<string, object>();
+
+                    bool isRelevant = members.ContainsKey(userId) || pending.ContainsKey(userId);
+                    if (!isRelevant) continue;
+
+                    // Parse GroupData
+                    Timestamp createdAt = Timestamp.FromDateTime(DateTime.UtcNow); // fallback mặc định
+
+                    if (data.ContainsKey("createdAt") && data["createdAt"] is Timestamp ts)
+                    {
+                        createdAt = ts;
+                    }
+
+                    var group = new GroupData
+                    {
+                        GroupId = doc.Id,
+                        Name = data.ContainsKey("name") ? data["name"]?.ToString() : "[No Name]",
+                        Avatar = data.ContainsKey("avatar") ? data["avatar"]?.ToString() : "Icons/group.png",
+                        CreatedBy = data.ContainsKey("createdBy") ? data["createdBy"]?.ToString() : "",
+                        CreatedAt = createdAt,
+                        MemberCount = data.ContainsKey("memberCount") ? Convert.ToInt32(data["memberCount"]) : 0,
+                        Members = members.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString()),
+                        PendingMembers = pending.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString())
+                    };
+
+
+                    updatedGroups.Add(group);
+                }
+
+                onGroupsChanged(updatedGroups);
+            });
+        }
+
+        public async Task StopListeningToUserRelatedGroupsAsync()
+        {
+            if (_groupChangeListener != null)
+            {
+                await _groupChangeListener.StopAsync();
+                _groupChangeListener = null;
+            }
+        }
+
+
 
 
         public FirestoreDb GetDb() => _firestoreDb;

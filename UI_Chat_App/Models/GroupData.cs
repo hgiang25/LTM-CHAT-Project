@@ -20,7 +20,7 @@ namespace ChatApp.Models
         public string CreatedBy { get; set; }
 
         [FirestoreProperty]
-        public Timestamp CreatedAt { get; set; }
+        public Timestamp? CreatedAt { get; set; }
 
         [FirestoreProperty]
         public string Avatar { get; set; }
