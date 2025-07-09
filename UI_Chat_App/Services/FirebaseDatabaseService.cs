@@ -946,9 +946,22 @@ namespace ChatApp.Services
 
             return docRef.Listen(snapshot =>
             {
-                if (snapshot.Exists && snapshot.TryGetValue("isTyping", out bool isTyping))
+                if (snapshot.Exists &&
+                    snapshot.TryGetValue("isTyping", out bool isTyping) &&
+                    snapshot.TryGetValue("timestamp", out Timestamp ts))
                 {
-                    onTypingStatusChanged(isTyping);
+                    var typingTime = ts.ToDateTime();
+                    var currentTime = DateTime.UtcNow;
+
+                    // Nếu thời gian typing quá 5 giây thì coi như không còn typing
+                    if ((currentTime - typingTime).TotalSeconds > 5)
+                    {
+                        onTypingStatusChanged(false);
+                    }
+                    else
+                    {
+                        onTypingStatusChanged(isTyping);
+                    }
                 }
                 else
                 {
@@ -956,6 +969,8 @@ namespace ChatApp.Services
                 }
             });
         }
+
+
 
         private FirestoreChangeListener _messageListener;
         //private bool _isMessageListenerActive = false;

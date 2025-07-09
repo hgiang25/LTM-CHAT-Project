@@ -1203,6 +1203,21 @@ namespace UI_Chat_App
 
             var selectedItem = UserListBox.SelectedItem;
 
+            // 🛑 Trước khi chuyển người hoặc nhóm, tắt typing và timer cũ
+            if (_selectedUser != null)
+            {
+                await SetTypingStatusAsync(false);
+                _typingTimer?.Stop();
+                _isTyping = false;
+            }
+
+            // 🛑 Hủy lắng nghe typing cũ nếu có
+            if (_typingStatusListener != null)
+            {
+                await _typingStatusListener.StopAsync();
+                _typingStatusListener = null;
+            }
+
             if (selectedItem is UserData newSelectedUser)
             {
                 EmptyPromptTextBlock.Visibility = Visibility.Collapsed;
@@ -1221,10 +1236,9 @@ namespace UI_Chat_App
                         return;
                     }
 
-                    // 👉 Hiện User profile, ẩn Group profile
                     GroupProfilePanel.Visibility = Visibility.Collapsed;
                     UserProfilePanel.Visibility = Visibility.Visible;
-                    UserProfileColumn.Width = new GridLength(230); // hoặc Auto tùy thiết kế
+                    UserProfileColumn.Width = new GridLength(230);
 
                     ChatWithTextBlock.Text = $"Chat with {_selectedUser.DisplayName}";
                     ProfileUsername.Text = $"Username: {_selectedUser.DisplayName}";
@@ -1238,31 +1252,27 @@ namespace UI_Chat_App
                     MessagesStackPanel.Children.Clear();
 
                     await RefreshNotificationAsync();
-                    StartListeningToTyping();
                     await _databaseService.StopListeningToMessagesAsync();
                     await LoadInitialMessagesAsync(_currentChatRoomId);
                     await StartListeningForMessages(_currentChatRoomId);
+
+                    StartListeningToTyping(); // ✅ Lắng nghe typing sau khi gán _selectedUser
                 }
             }
             else if (selectedItem is GroupData selectedGroup)
             {
                 EmptyPromptTextBlock.Visibility = Visibility.Collapsed;
 
-                // --- Xử lý chat nhóm ---                
                 _selectedGroup = await _databaseService.GetGroupAsync(selectedGroup.GroupId);
-                //_selectedGroup = selectedGroup;
                 _selectedUser = null;
 
-                // Ẩn toàn bộ UI liên quan đến member list khi chuyển nhóm
                 GroupMembersList.ItemsSource = null;
                 GroupMembersList.Visibility = Visibility.Collapsed;
                 PendingMembersListBox.ItemsSource = null;
                 PendingMembersListBox.Visibility = Visibility.Collapsed;
                 PendingMembersLabel.Visibility = Visibility.Collapsed;
-                //PendingMembersButtonsPanel.Visibility = Visibility.Collapsed;
                 ApproveSelectedButton.Visibility = Visibility.Collapsed;
                 RejectSelectedButton.Visibility = Visibility.Collapsed;
-                //InviteMember
                 FriendCheckboxList.ItemsSource = null;
                 FriendCheckboxList.Visibility = Visibility.Collapsed;
                 ConfirmInviteButton.Visibility = Visibility.Collapsed;
@@ -1271,15 +1281,13 @@ namespace UI_Chat_App
                 var Admin = await GetUserNameById(_selectedGroup.CreatedBy);
 
                 bool isAdmin = _selectedGroup.Members.TryGetValue(App.CurrentUser.Id, out var role)
-               && role.Equals("admin", StringComparison.OrdinalIgnoreCase);
+                               && role.Equals("admin", StringComparison.OrdinalIgnoreCase);
                 DeleteGroupButton.Visibility = isAdmin ? Visibility.Visible : Visibility.Collapsed;
-                Console.WriteLine($"Is Admin: {isAdmin}");
 
-                // 👉 Hiện Group profile, ẩn User profile
                 UserProfilePanel.Visibility = Visibility.Collapsed;
                 GroupProfilePanel.Visibility = Visibility.Visible;
                 UserProfileColumn.Width = new GridLength(230);
-                
+
                 ChatWithTextBlock.Text = $"Group: {_selectedGroup.Name}";
                 GroupProfileName.Text = _selectedGroup.Name;
                 GroupCreatedBy.Text = $"Admin: {Admin}";
@@ -1295,13 +1303,17 @@ namespace UI_Chat_App
                 await _databaseService.StopListeningToMessagesAsync();
                 await LoadInitialMessagesAsync(_currentChatRoomId);
                 await StartListeningForMessages(_currentChatRoomId);
-            }
 
+                // ✅ Ẩn typing nếu đang từ user chuyển qua group
+                TypingStatusTextBlock.Text = "";
+                TypingStatusTextBlock.Visibility = Visibility.Collapsed;
+            }
             else
             {
                 ResetChatUI();
             }
         }
+
 
 
         private void ResetChatUI()
@@ -1389,30 +1401,32 @@ namespace UI_Chat_App
 
         private async void StartListeningToTyping()
         {
-            // Dừng lắng nghe cũ nếu có
+            if (_selectedUser == null || App.CurrentUser == null) return;
+
+            var selectedUserId = _selectedUser.Id;
+            var selectedDisplayName = _selectedUser.DisplayName;
+
+            // Stop listener cũ
             if (_typingStatusListener != null)
             {
                 await _typingStatusListener.StopAsync();
                 _typingStatusListener = null;
             }
 
-            // Kiểm tra điều kiện trước khi lắng nghe
-            if (_selectedUser == null || App.CurrentUser == null)
-                return;
-
-            // Bắt đầu lắng nghe mới
-            _typingStatusListener = _databaseService.ListenToTypingStatus(
-                App.CurrentUser.Id,
-                _selectedUser.Id,
-                isTyping =>
+            _typingStatusListener = _databaseService.ListenToTypingStatus(App.CurrentUser.Id, selectedUserId, isTyping =>
+            {
+                Dispatcher.Invoke(() =>
                 {
-                    Dispatcher.Invoke(() =>
-                    {
-                        TypingStatusTextBlock.Text = isTyping ? $"{_selectedUser.DisplayName} is typing..." : "";
-                        TypingStatusTextBlock.Visibility = isTyping ? Visibility.Visible : Visibility.Collapsed;
-                    });
+                    // Nếu người đang được chọn không còn là người này nữa thì bỏ qua
+                    if (_selectedUser == null || _selectedUser.Id != selectedUserId)
+                        return;
+
+                    TypingStatusTextBlock.Text = isTyping ? $"{selectedDisplayName} is typing..." : "";
+                    TypingStatusTextBlock.Visibility = isTyping ? Visibility.Visible : Visibility.Collapsed;
                 });
+            });
         }
+
 
 
 
