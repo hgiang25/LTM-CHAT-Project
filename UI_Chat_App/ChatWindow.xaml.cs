@@ -1312,14 +1312,13 @@ namespace UI_Chat_App
                 await LoadInitialMessagesAsync(_currentChatRoomId);
                 await StartListeningForMessages(_currentChatRoomId);
 
-                
+
 
                 // Hiển thị nút chỉnh sửa tên nhóm nếu là admin
                 EditGroupNameButton.Visibility = isAdmin ? Visibility.Visible : Visibility.Collapsed;
 
                 // Ẩn nút chỉnh sửa username
                 EditUsernameButton.Visibility = Visibility.Collapsed;
-            }
 
                 // ✅ Ẩn typing nếu đang từ user chuyển qua group
                 TypingStatusTextBlock.Text = "";
