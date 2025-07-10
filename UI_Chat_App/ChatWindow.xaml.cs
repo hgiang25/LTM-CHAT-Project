@@ -25,6 +25,7 @@ using System.Windows.Media.Animation;
 using Google.Cloud.Firestore.V1;
 using UI_Chat_App.Models;
 using System.ComponentModel.Design.Serialization;
+using Microsoft.Win32;
 
 namespace UI_Chat_App
 {
@@ -1136,6 +1137,9 @@ namespace UI_Chat_App
 
             // Cập nhật dữ liệu cho profile của user hiện tại
             UpdateUserProfile(App.CurrentUser);
+
+            EditUsernameButton.Visibility = Visibility.Visible;
+
         }
 
         private void UpdateUserProfile(UserData user)
@@ -1242,6 +1246,9 @@ namespace UI_Chat_App
                     await _databaseService.StopListeningToMessagesAsync();
                     await LoadInitialMessagesAsync(_currentChatRoomId);
                     await StartListeningForMessages(_currentChatRoomId);
+
+                    EditUsernameButton.Visibility = Visibility.Collapsed;
+                    EditGroupNameButton.Visibility = Visibility.Collapsed;
                 }
             }
             else if (selectedItem is GroupData selectedGroup)
@@ -1295,6 +1302,14 @@ namespace UI_Chat_App
                 await _databaseService.StopListeningToMessagesAsync();
                 await LoadInitialMessagesAsync(_currentChatRoomId);
                 await StartListeningForMessages(_currentChatRoomId);
+
+                
+
+                // Hiển thị nút chỉnh sửa tên nhóm nếu là admin
+                EditGroupNameButton.Visibility = isAdmin ? Visibility.Visible : Visibility.Collapsed;
+
+                // Ẩn nút chỉnh sửa username
+                EditUsernameButton.Visibility = Visibility.Collapsed;
             }
 
             else
@@ -3040,38 +3055,214 @@ namespace UI_Chat_App
             }
         }
 
-        private void EditGroupAvatarButton_Click(object sender, RoutedEventArgs e)
-        {
-
-        }
-
         private void EditGroupNameButton_Click(object sender, RoutedEventArgs e)
         {
+            // Toggle edit mode for group name
+            GroupProfileName.Visibility = Visibility.Collapsed;
+            ProfileGroupTextBox.Visibility = Visibility.Visible;
 
+            // Set text and focus
+            ProfileGroupTextBox.Text = GroupProfileName.Text;
+            ProfileGroupTextBox.Focus();
+            ProfileGroupTextBox.SelectAll();
         }
-        
+
         private void GroupnameEditTextBox_KeyDown(object sender, KeyEventArgs e)
         {
-
+            if (e.Key == Key.Enter)
+            {
+                // Save on Enter
+                SaveGroupName();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                // Cancel on Escape
+                CancelGroupNameEdit();
+                e.Handled = true;
+            }
         }
-        
+
         private void GroupnameEditTextBox_LostFocus(object sender, RoutedEventArgs e)
         {
+            // Auto-save when focus is lost
+            SaveGroupName();
+        }
+
+        private async void SaveGroupName()
+        {
+            string newName = ProfileGroupTextBox.Text.Trim();
+
+            if (!string.IsNullOrEmpty(newName) && newName != GroupProfileName.Text)
+            {
+                try
+                {
+                    // Hiển thị trạng thái loading
+                    SetLoadingState(true);
+
+                    // Cập nhật tên mới cho nhóm
+                    await _databaseService.UpdateGroupNameAsync(_selectedGroup.GroupId, newName);
+
+                    // Cập nhật UI sau khi thành công
+                    GroupProfileName.Text = newName;
+                    ChatWithTextBlock.Text = $"Group: {newName}"; // Cập nhật tiêu đề chat
+
+                    // Gửi thông báo hệ thống
+                    await _databaseService.SendSystemMessageToChatAsync(
+                        _selectedGroup.GroupId,
+                        $"📝 Đã đổi tên nhóm thành '{newName}'"
+                    );
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Lỗi khi cập nhật tên nhóm: {ex.Message}");
+                }
+                finally
+                {
+                    SetLoadingState(false);
+                }
+            }
+
+            // Reset UI
+            GroupProfileName.Visibility = Visibility.Visible;
+            ProfileGroupTextBox.Visibility = Visibility.Collapsed;
+        }
+
+        private void CancelGroupNameEdit()
+        {
+            // Reset without saving
+            GroupProfileName.Visibility = Visibility.Visible;
+            ProfileGroupTextBox.Visibility = Visibility.Collapsed;
+        }
+
+        private async void GroupProfileAvatar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_selectedGroup == null) return;
+
+            // Kiểm tra quyền admin
+            bool isAdmin = _selectedGroup.Members.TryGetValue(App.CurrentUser.Id, out var role) &&
+                           role.Equals("admin", StringComparison.OrdinalIgnoreCase);
+
+            if (!isAdmin)
+            {
+                MessageBox.Show("Chỉ admin mới có quyền đổi ảnh nhóm");
+                return;
+            }
+
+            OpenFileDialog openFileDialog = new OpenFileDialog
+            {
+                Filter = "Image files (*.jpg, *.jpeg, *.png)|*.jpg;*.jpeg;*.png",
+                Title = "Chọn ảnh đại diện nhóm"
+            };
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                try
+                {
+                    // Hiển thị trạng thái loading
+                    SetLoadingState(true);
+
+                    // Upload ảnh lên S3
+                    string newAvatarUrl = await _databaseService.UploadFileToS3Async(
+                        openFileDialog.FileName,
+                        "group-avatars"
+                    );
+
+                    // Cập nhật avatar trong database
+                    await _databaseService.UpdateGroupAvatarAsync(_selectedGroup.GroupId, newAvatarUrl);
+
+                    // Load and display new image
+                    BitmapImage bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.UriSource = new Uri(newAvatarUrl);
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.EndInit();
+                    GroupProfileAvatar.Source = bitmap;
+
+                    // Gửi thông báo hệ thống
+                    await _databaseService.SendSystemMessageToChatAsync(
+                        _selectedGroup.GroupId,
+                        "🖼️ Đã cập nhật ảnh đại diện nhóm"
+                    );
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Lỗi khi cập nhật ảnh đại diện: {ex.Message}");
+                }
+                finally
+                {
+                    SetLoadingState(false);
+                }
+            }
+        }
+
+        private void SetLoadingState(bool isLoading)
+        {
+            GroupProfileAvatar.IsEnabled = !isLoading;
 
         }
+
         private void EditUsernameButton_Click(object sender, RoutedEventArgs e)
         {
+            // Tách chỉ tên người dùng từ TextBlock
+            string currentText = ProfileUsername.Text;
+            string userName = currentText.Replace("Username: ", ""); // Loại bỏ phần tiền tố
 
+            // Toggle edit mode for username
+            ProfileUsername.Visibility = Visibility.Collapsed;
+            ProfileUsernameTextBox.Visibility = Visibility.Visible;
+
+            // Set text and focus - chỉ chứa tên người dùng
+            ProfileUsernameTextBox.Text = userName;
+            ProfileUsernameTextBox.Focus();
+            ProfileUsernameTextBox.SelectAll();
         }
 
         private void UsernameEditTextBox_KeyDown(object sender, KeyEventArgs e)
         {
-
+            if (e.Key == Key.Enter)
+            {
+                SaveUsername();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                CancelUsernameEdit();
+                e.Handled = true;
+            }
         }
 
         private void UsernameEditTextBox_LostFocus(object sender, RoutedEventArgs e)
         {
+            SaveUsername();
+        }
 
+        private void SaveUsername()
+        {
+            string newName = ProfileUsernameTextBox.Text.Trim();
+
+            if (!string.IsNullOrEmpty(newName))
+            {
+                // Cập nhật tên mới cho người dùng
+                App.CurrentUser.DisplayName = newName;
+
+                // Update UI với định dạng đầy đủ
+                ProfileUsername.Text = $"Username: {newName}";
+                UsernameTextBlock.Text = newName; // Cập nhật tên trên header
+
+                // Lưu vào database
+                _ = _databaseService.SaveUserAsync(App.IdToken, App.CurrentUser);
+            }
+
+            // Reset UI
+            ProfileUsername.Visibility = Visibility.Visible;
+            ProfileUsernameTextBox.Visibility = Visibility.Collapsed;
+        }
+
+        private void CancelUsernameEdit()
+        {
+            ProfileUsername.Visibility = Visibility.Visible;
+            ProfileUsernameTextBox.Visibility = Visibility.Collapsed;
         }
     }
 }

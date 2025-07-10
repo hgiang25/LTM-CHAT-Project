@@ -1647,5 +1647,36 @@ namespace ChatApp.Services
                 _callListener = null;
             }
         }
+        // Cập nhật tên nhóm
+        public async Task UpdateGroupNameAsync(string groupId, string newName)
+        {
+            try
+            {
+                DocumentReference groupRef = _firestoreDb.Collection("groups").Document(groupId);
+                await groupRef.UpdateAsync("name", newName);
+                Console.WriteLine($"✅ Updated group name: {groupId} -> {newName}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Failed to update group name: {ex.Message}");
+                throw;
+            }
+        }
+
+        // Cập nhật avatar nhóm
+        public async Task UpdateGroupAvatarAsync(string groupId, string newAvatarUrl)
+        {
+            try
+            {
+                DocumentReference groupRef = _firestoreDb.Collection("groups").Document(groupId);
+                await groupRef.UpdateAsync("avatar", newAvatarUrl);
+                Console.WriteLine($"✅ Updated group avatar: {groupId} -> {newAvatarUrl}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Failed to update group avatar: {ex.Message}");
+                throw;
+            }
+        }
     }
 }
