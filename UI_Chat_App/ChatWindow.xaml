@@ -1221,7 +1221,10 @@
                             </Button>
                         </StackPanel>
                     </Grid>
-                    <TextBlock x:Name="EmptyPromptTextBlock" Grid.Row="1" Grid.ColumnSpan="2" Text="Please choose someone to start" Visibility="Visible" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="Gray" Margin="10"/>
+                    <TextBlock x:Name="EmptyPromptTextBlock" FontSize="30"
+                               FontStyle="Italic"
+                               FontWeight="Bold"
+                               Grid.Row="1" Grid.ColumnSpan="2" Text="Please choose someone to start" Visibility="Visible" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="Gray" Margin="10"/>
                     <ScrollViewer x:Name="MessagesScrollViewer" Grid.Row="1" Grid.ColumnSpan="2" VerticalScrollBarVisibility="Auto" Margin="10">
                         <StackPanel x:Name="MessagesStackPanel"/>
                     </ScrollViewer>
