@@ -701,19 +701,36 @@ namespace UI_Chat_App
 
                     case "Image":
                         var image = new Image
-                                {
-                                    Width = 200,
-                                    Height = 200,
-                                    HorizontalAlignment = message.SenderId == App.CurrentUser.Id ? HorizontalAlignment.Right : HorizontalAlignment.Left
-                                };
-                                var binding = new Binding("FileUrl")
-                                {
-                                    Source = message,
-                                    Converter = (IValueConverter)FindResource("ImageUrlConverter"),
-                                    FallbackValue = new BitmapImage(new Uri("pack://application:,,,/Icons/user.png", UriKind.Absolute))
-                                };
-                                image.SetBinding(Image.SourceProperty, binding);
-                                stack.Children.Add(image);
+                        {
+                            Width = 200,
+                            Height = 200,
+                            HorizontalAlignment = message.SenderId == App.CurrentUser.Id
+                                                                    ? HorizontalAlignment.Right
+                                                                    : HorizontalAlignment.Left,
+                            Cursor = Cursors.Hand // Thêm con trỏ tay
+                        };
+
+                        var binding = new Binding("FileUrl")
+                        {
+                            Source = message,
+                            Converter = (IValueConverter)FindResource("ImageUrlConverter"),
+                            FallbackValue = new BitmapImage(new Uri("pack://application:,,,/Icons/user.png"))
+                        };
+
+                        image.SetBinding(Image.SourceProperty, binding);
+
+                        // Thêm sự kiện click để phóng to ảnh
+                        image.MouseLeftButtonDown += (s, args) =>
+                        {
+                            if (!string.IsNullOrEmpty(message.FileUrl))
+                            {
+                                var viewer = new ImageViewerWindow(message.FileUrl);
+                                viewer.Owner = this; // Đặt cửa sổ chính là owner
+                                viewer.ShowDialog();
+                            }
+                        };
+
+                        stack.Children.Add(image);
                         break;
 
 
@@ -781,34 +798,99 @@ namespace UI_Chat_App
                             break;
                         }
 
-                        var playVoiceButton = new Button
+                        string voiceDuration = "0:00";
+                        try
                         {
-                            Content = "Phát tin nhắn thoại",
-                            Tag = voicePath,
-                            Margin = new Thickness(5)
+                            using (var audioFile = new AudioFileReader(voicePath))
+                            {
+                                voiceDuration = audioFile.TotalTime.ToString(@"m\:ss");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"⛔ Không thể lấy thời lượng âm thanh: {ex.Message}");
+                        }
+
+                        // Tạo panel cho tin nhắn thoại
+                        // Tạo panel cho tin nhắn thoại
+                        var voicePanel = new Border
+                        {
+                            Background = isMine ? Brushes.LightGreen : Brushes.White,
+                            CornerRadius = new CornerRadius(15),
+                            Padding = new Thickness(12, 8, 12, 8),
+                            Cursor = Cursors.Hand,
+                            ToolTip = "Nhấn để phát",
+                            MinWidth = 150, // 👈 Thêm MinWidth
+                            MaxWidth = 300, // 👈 Thêm MaxWidth nếu muốn giới hạn chiều ngang
+                            Effect = new System.Windows.Media.Effects.DropShadowEffect
+                            {
+                                BlurRadius = 5,
+                                Opacity = 0.2,
+                                ShadowDepth = 2
+                            }
                         };
-                        playVoiceButton.Click += (s, e) =>
+
+                        var voiceStack = new StackPanel
+                        {
+                            Orientation = Orientation.Horizontal,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            HorizontalAlignment = HorizontalAlignment.Left,
+                        };
+
+                        // Icon loa
+                        var voiceIcon = new Image
+                        {
+                            Source = new BitmapImage(new Uri("pack://application:,,,/Icons/voice_play.png")),
+                            Width = 20,
+                            Height = 20,
+                            Margin = new Thickness(0, 0, 8, 0)
+                        };
+
+                        // Thời lượng
+                        var durationText = new TextBlock
+                        {
+                            VerticalAlignment = VerticalAlignment.Center,
+                            Foreground = Brushes.Black,
+                            FontSize = 14,
+                            Text = voiceDuration, // 👈 Thêm giá trị mặc định để tránh chồng
+                            Margin = new Thickness(4, 0, 0, 0)
+                        };
+
+                        voiceStack.Children.Add(voiceIcon);
+                        voiceStack.Children.Add(durationText);
+                        voicePanel.Child = voiceStack;
+
+
+                        // Sự kiện click để phát
+                        voicePanel.MouseLeftButtonDown += (s, e) =>
                         {
                             try
                             {
-                                var filePath = (string)((Button)s).Tag;
-                                var audioFile = new AudioFileReader(filePath);
+                                var audioFile = new AudioFileReader(voicePath);
                                 var outputDevice = new WaveOutEvent();
                                 outputDevice.Init(audioFile);
                                 outputDevice.Play();
+
+                                // Hiệu ứng khi đang phát
+                                voiceIcon.Source = new BitmapImage(new Uri("pack://application:,,,/Icons/sound.png"));
+                                voicePanel.Background = Brushes.LightBlue;
+
                                 outputDevice.PlaybackStopped += (snd, args) =>
                                 {
+                                    // Khôi phục trạng thái ban đầu
+                                    voiceIcon.Source = new BitmapImage(new Uri("pack://application:,,,/Icons/voice_play.png"));
+                                    voicePanel.Background = isMine ? Brushes.LightGreen : Brushes.White;
                                     audioFile.Dispose();
                                     outputDevice.Dispose();
                                 };
                             }
                             catch (Exception ex)
                             {
-                                MessageBox.Show($"Không thể phát tin nhắn thoại: {ex.Message}");
+                                MessageBox.Show($"Không thể phát: {ex.Message}");
                             }
                         };
 
-                        stack.Children.Add(playVoiceButton);
+                        stack.Children.Add(voicePanel);
                         break;
 
                     case "Emoji":
@@ -3314,6 +3396,49 @@ namespace UI_Chat_App
         {
             ProfileUsername.Visibility = Visibility.Visible;
             ProfileUsernameTextBox.Visibility = Visibility.Collapsed;
+        }
+
+        private class ImageViewerWindow : Window
+        {
+            public ImageViewerWindow(string imageUrl)
+            {
+                // Thiết lập cửa sổ
+                WindowStyle = WindowStyle.None;
+                WindowState = WindowState.Maximized;
+                ResizeMode = ResizeMode.NoResize;
+                Background = Brushes.Black;
+                Topmost = true;
+                WindowStartupLocation = WindowStartupLocation.CenterOwner;
+
+                // Tạo Image control
+                var image = new Image
+                {
+                    Stretch = Stretch.Uniform,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+
+                try
+                {
+                    // Tải ảnh chất lượng cao
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.UriSource = new Uri(imageUrl);
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.EndInit();
+                    image.Source = bitmap;
+                }
+                catch
+                {
+                    // Xử lý lỗi tải ảnh
+                    image.Source = new BitmapImage(new Uri("pack://application:,,,/Icons/error.png"));
+                }
+
+                // Click để đóng cửa sổ
+                image.MouseLeftButtonDown += (s, e) => Close();
+
+                Content = image;
+            }
         }
     }
 }
