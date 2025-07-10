@@ -417,7 +417,6 @@
                            Margin="0,3,0,0"/>
                     </StackPanel>
 
-                    <!-- More Options giống User -->
                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
                         <Popup x:Name="DeletePopup"
                        Placement="Top"
@@ -1349,7 +1348,7 @@
                             </Button>
 
                             <!-- Popup cho Emoji -->
-                            <Popup x:Name="EmojiPopup" Placement="Top" PlacementTarget="{Binding ElementName=LikeButton}" StaysOpen="False" AllowsTransparency="True">
+                            <Popup x:Name="EmojiPopup" HorizontalOffset="-50" Placement="Top" PlacementTarget="{Binding ElementName=LikeButton}" StaysOpen="False" AllowsTransparency="True">
                                 <Border Background="White" CornerRadius="8" Padding="5" BorderBrush="LightGray" BorderThickness="1">
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                         <!-- Thêm các nút emoji -->
@@ -1447,28 +1446,14 @@
             <Border x:Name="GroupProfilePanel" Visibility="Collapsed" Grid.Column="2" Grid.Row="1" Background="{StaticResource SecondaryColor}" Margin="10" CornerRadius="20">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="10">
-                        <Grid Margin="30,10,0,0" HorizontalAlignment="Center">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Image x:Name="GroupProfileAvatar" Grid.Column="0" Width="100" Height="100" Stretch="UniformToFill" HorizontalAlignment="Right"/>
-                            <Button x:Name="EditGroupAvatarButton" Grid.Column="1" 
-                                    Width="30" Height="30"
-                                    VerticalAlignment="Bottom"
-                                    Background="Transparent" BorderBrush="Transparent" 
-                                    Click="EditGroupAvatarButton_Click"
-                                    Style="{StaticResource WindowButtonStyle}">
-                                <Image Source="Icons/group_image.png" Width="20" Height="20"/>
-                            </Button>
-                        </Grid>
-                        <Grid Margin="15,10,0,0">
+                        <Image x:Name="GroupProfileAvatar" MouseLeftButtonDown="GroupProfileAvatar_MouseLeftButtonDown" Grid.Column="0" Width="100" Height="100" Stretch="UniformToFill" HorizontalAlignment="Center" Source="{Binding SelectedGroup.Avatar, Converter={StaticResource ImageUrlConverter}}"/>
+                            <Grid Margin="15,10,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock x:Name="GroupProfileName" Grid.Column="0" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimaryColor}" Margin="0,10,0,5" TextAlignment="Center"/>
-                            <TextBlock x:Name="ProfileGroupTextBox" Grid.Column="0"
+                            <TextBox x:Name="ProfileGroupTextBox" Grid.Column="0"
                                      Visibility="Collapsed"
                                      FontSize="16" Margin="0,10,0,0" Padding="2"
                                      VerticalAlignment="Center"
