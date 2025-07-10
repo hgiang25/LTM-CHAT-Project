@@ -544,9 +544,13 @@ namespace UI_Chat_App
             public bool Equals(object x, object y)
             {
                 if (x is UserData ux && y is UserData uy)
-                    return ux.Id == uy.Id;
+                    return ux.Id == uy.Id && ux.DisplayName == uy.DisplayName && ux.Avatar == uy.Avatar;
+
                 if (x is GroupData gx && y is GroupData gy)
-                    return gx.GroupId == gy.GroupId;
+                    return gx.GroupId == gy.GroupId
+                           && gx.Name == gy.Name
+                           && gx.Avatar == gy.Avatar;
+
                 return false;
             }
 
@@ -557,6 +561,7 @@ namespace UI_Chat_App
                 return obj?.GetHashCode() ?? 0;
             }
         }
+
 
 
         // Thêm class UserDataComparer để so sánh danh sách bạn bè
@@ -2539,51 +2544,155 @@ namespace UI_Chat_App
             _typingTimer.Start();
         }
 
+        private List<string> _previousGroupIds = new List<string>();
+
         private async void StartListeningToAllGroupChanges()
         {
-            // Ngắt các listener cũ
             await _databaseService.StopListeningToUserRelatedGroupsAsync();
             await _databaseService.StopListeningToEachUserGroupAsync();
 
-            // 1. Bước đầu: lắng nghe danh sách nhóm của user (thêm/xoá)
             _databaseService.ListenToUserRelatedGroupsAsync(App.CurrentUser.Id, async updatedGroups =>
             {
                 await Dispatcher.InvokeAsync(async () =>
                 {
-                    // Cập nhật danh sách nhóm hiển thị
-                    _groups.Clear();
-                    foreach (var group in updatedGroups)
-                        _groups.Add(group);
-                    UpdateChatroomList();
+                    string selectedGroupId = _selectedGroup?.GroupId;
 
-                    // 2. Với danh sách nhóm hiện tại => lắng nghe từng group cụ thể
-                    var groupIds = updatedGroups.Select(g => g.GroupId).ToList();
-                    await _databaseService.ListenToEachUserGroupAsync(groupIds, updatedGroup =>
+                    // 🔁 Cập nhật danh sách nhóm
+                    foreach (var updatedGroup in updatedGroups)
                     {
-                        Dispatcher.Invoke(() =>
+                        var existing = _groups.FirstOrDefault(g => g.GroupId == updatedGroup.GroupId);
+                        if (existing == null)
                         {
-                            var index = _groups.ToList().FindIndex(g => g.GroupId == updatedGroup.GroupId);
-                            if (index >= 0)
+                            // 👇 Gán AvatarBitmap trước khi thêm
+                            if (!string.IsNullOrEmpty(updatedGroup.Avatar))
                             {
-                                _groups[index] = updatedGroup;
+                                var bitmap = await DownloadImageSafelyAsync(updatedGroup.Avatar);
+                                if (bitmap != null)
+                                    updatedGroup.AvatarBitmap = bitmap;
                             }
-                            else
+
+                            // ✅ Chỉ thêm vào khi ảnh đã sẵn sàng (hoặc không có ảnh)
+                            if (updatedGroup.AvatarBitmap != null || string.IsNullOrEmpty(updatedGroup.Avatar))
                             {
                                 _groups.Add(updatedGroup);
                             }
+                        }
+                        else
+                        {
+                            // Cập nhật thuộc tính nếu đã có
+                            existing.Name = updatedGroup.Name;
+                            existing.MemberCount = updatedGroup.MemberCount;
 
-                            UpdateChatroomList();
-
-                            if (_selectedGroup?.GroupId == updatedGroup.GroupId)
+                            if (!string.IsNullOrEmpty(updatedGroup.Avatar) && updatedGroup.Avatar != existing.Avatar)
                             {
-                                _selectedGroup = updatedGroup;
-                                _ = RefreshGroupUIAsync();
-                                UpdateGroupMemberCount();
+                                var bitmap = await DownloadImageSafelyAsync(updatedGroup.Avatar);
+                                if (bitmap != null)
+                                {
+                                    existing.Avatar = updatedGroup.Avatar;
+                                    existing.AvatarBitmap = bitmap;
+                                }
                             }
+                        }
+                    }
+
+
+                    // Loại bỏ những group không còn nữa
+                    var toRemove = _groups.Where(g => !updatedGroups.Any(ug => ug.GroupId == g.GroupId)).ToList();
+                    foreach (var g in toRemove)
+                        _groups.Remove(g);
+
+
+                    UpdateChatroomList();
+
+                    // 🔁 Trì hoãn gán lại selectedGroup khi UI đã binding lại
+                    await Dispatcher.BeginInvoke(new Action(async () =>
+                    {
+                        if (!string.IsNullOrEmpty(selectedGroupId))
+                        {
+                            var matched = _groups.FirstOrDefault(g => g.GroupId == selectedGroupId);
+                            if (matched != null && !ReferenceEquals(_selectedGroup, matched))
+                            {
+                                _selectedGroup = matched;
+                                await RefreshGroupUIAsync();
+                                await UpdateGroupHeaderAsync();
+                            }
+                        }
+
+                    }), System.Windows.Threading.DispatcherPriority.ContextIdle);
+
+                    // 🔁 Gắn lại các listener nếu GroupId thay đổi
+                    var newGroupIds = updatedGroups.Select(g => g.GroupId).ToList();
+                    if (!_previousGroupIds.SequenceEqual(newGroupIds))
+                    {
+                        _previousGroupIds = newGroupIds;
+
+                        await _databaseService.ListenToEachUserGroupAsync(newGroupIds, async updatedGroup =>
+                        {
+                            await Dispatcher.InvokeAsync(async () =>
+                            {
+                                var existing = _groups.FirstOrDefault(g => g.GroupId == updatedGroup.GroupId);
+                                if (existing != null)
+                                {
+                                    existing.Name = updatedGroup.Name;
+
+                                    if (!string.IsNullOrEmpty(updatedGroup.Avatar))
+                                    {
+                                        var bitmap = await DownloadImageSafelyAsync(updatedGroup.Avatar);
+                                        if (bitmap != null)
+                                        {
+                                            existing.Avatar = updatedGroup.Avatar;
+                                            existing.AvatarBitmap = bitmap;
+                                        }
+                                    }
+                                }
+
+                                // Nếu là nhóm đang chọn
+                                if (_selectedGroup?.GroupId == updatedGroup.GroupId)
+                                {
+                                    _selectedGroup.Name = updatedGroup.Name;
+
+                                    if (!string.IsNullOrEmpty(updatedGroup.Avatar))
+                                    {
+                                        var bitmap = await DownloadImageSafelyAsync(updatedGroup.Avatar);
+                                        if (bitmap != null)
+                                            _selectedGroup.Avatar = updatedGroup.Avatar;
+                                    }
+
+                                    await RefreshGroupUIAsync();
+                                    await UpdateGroupHeaderAsync();
+                                }
+                            });
                         });
-                    });
+                    }
                 });
             });
+        }
+
+
+
+
+
+        private async Task<BitmapImage> DownloadImageSafelyAsync(string url, int maxRetries = 3)
+        {
+            for (int i = 0; i < maxRetries; i++)
+            {
+                try
+                {
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.UriSource = new Uri(url, UriKind.Absolute);
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.EndInit();
+                    bitmap.Freeze(); // Cho phép dùng trên UI thread khác
+                    return bitmap;
+                }
+                catch
+                {
+                    await Task.Delay(1000); // Retry sau 1s
+                }
+            }
+
+            return null;
         }
 
 
@@ -2607,7 +2716,12 @@ namespace UI_Chat_App
             GroupMembersList.Visibility = members.Any() ? Visibility.Visible : Visibility.Collapsed;
 
             // 3. Nếu là admin thì cập nhật danh sách pending và danh sách bạn bè có thể mời
-            bool isAdmin = _selectedGroup.Members.TryGetValue(App.CurrentUser.Id, out var role) && role == "admin";
+            bool isAdmin = false;
+            if (_selectedGroup?.Members != null &&
+                _selectedGroup.Members.TryGetValue(App.CurrentUser.Id, out var role))
+            {
+                isAdmin = role == "admin";
+            }
             if (isAdmin)
             {
                 // 3.1 Cập nhật danh sách thành viên chờ duyệt
@@ -2641,17 +2755,49 @@ namespace UI_Chat_App
         }
 
 
-        private void UpdateGroupMemberCount()
+        private async Task UpdateGroupHeaderAsync()
         {
-            if (_selectedGroup?.Members == null)
+            if (_selectedGroup == null)
             {
+                ChatWithTextBlock.Text = "[No Group]";
+                GroupCreatedBy.Text = "";
                 GroupMemberCount.Text = "Members: 0 members";
+                GroupProfileAvatar.Source = null;
+                GroupProfileName.Text = "";
                 return;
             }
 
-            int memberCount = _selectedGroup.Members.Count;
+            // ✅ Tên nhóm
+            ChatWithTextBlock.Text = _selectedGroup.Name ?? "[No Name]";
+            GroupProfileName.Text = _selectedGroup.Name ?? "[No Name]"; // <- Cần bổ sung dòng này
+
+            // ✅ Admin
+            if (!string.IsNullOrEmpty(_selectedGroup.CreatedBy))
+            {
+                var adminName = await GetUserNameById(_selectedGroup.CreatedBy);
+                GroupCreatedBy.Text = $"Admin: {adminName}";
+            }
+            else
+            {
+                GroupCreatedBy.Text = "Admin: [Unknown]";
+            }
+
+            // ✅ Số lượng thành viên
+            int memberCount = _selectedGroup.Members?.Count ?? 0;
             GroupMemberCount.Text = $"Members: {memberCount} members";
+
+            // ✅ Avatar nhóm
+            try
+            {
+                GroupProfileAvatar.Source = LoadAvatar(_selectedGroup.Avatar);
+            }
+            catch
+            {
+                GroupProfileAvatar.Source = null;
+            }
         }
+
+
 
 
 
@@ -2722,7 +2868,7 @@ namespace UI_Chat_App
                         $"{displayName} đã bị xoá khỏi nhóm bởi {App.CurrentUser.DisplayName}."
                     );                    
                     await RefreshGroupUIAsync();
-                    UpdateGroupMemberCount();                    
+                    UpdateGroupHeaderAsync();                    
                 }
                 catch (Exception ex)
                 {
@@ -2756,7 +2902,7 @@ namespace UI_Chat_App
                     }
                     MessageBox.Show($"Đã duyệt {selectedMembers.Count} thành viên.");
                     await RefreshGroupUIAsync();
-                    UpdateGroupMemberCount();
+                    UpdateGroupHeaderAsync();
                 }
                 catch (Exception ex)
                 {
@@ -2879,7 +3025,7 @@ namespace UI_Chat_App
             {
                 //_selectedGroup = await _databaseService.GetGroupAsync(groupId); // lấy lại dữ liệu nhóm mới                
                 await RefreshGroupUIAsync();
-                UpdateGroupMemberCount();
+                UpdateGroupHeaderAsync();
             }
         }
 
@@ -2891,33 +3037,42 @@ namespace UI_Chat_App
 
         private async void LeaveGroupButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_selectedGroup == null)
+            {
+                MessageBox.Show("Không có nhóm nào được chọn.");
+                return;
+            }
+
             var currentUserId = App.CurrentUser.Id;
+            var groupId = _selectedGroup.GroupId;
 
-            // Cập nhật lại dữ liệu nhóm từ Firestore
-            _selectedGroup = await _databaseService.GetGroupAsync(_selectedGroup.GroupId);
+            // Cập nhật lại dữ liệu nhóm mới nhất từ Firestore
+            var latestGroup = await _databaseService.GetGroupAsync(groupId);
+            if (latestGroup == null || latestGroup.Members == null)
+            {
+                MessageBox.Show("Không thể lấy thông tin nhóm.");
+                return;
+            }
 
-            // Kiểm tra quyền sau khi đã có dữ liệu mới nhất
-            bool isAdmin = _selectedGroup.Members.TryGetValue(currentUserId, out var role) && role == "admin";
-
+            bool isAdmin = latestGroup.Members.TryGetValue(currentUserId, out var role) && role == "admin";
 
             if (isAdmin)
             {
-                if (_selectedGroup.Members.Count <= 1)
+                if (latestGroup.Members.Count <= 1)
                 {
                     MessageBox.Show("Bạn là thành viên duy nhất. Không thể rời nhóm.");
                     return;
                 }
 
-                // Tạo danh sách thành viên khác
-                var otherMembers = _selectedGroup.Members
+                // Danh sách các thành viên còn lại
+                var otherMembers = latestGroup.Members
                     .Where(kvp => kvp.Key != currentUserId)
                     .ToList();
 
-                // Lấy tên hiển thị (nếu cần bạn có thể cache UserData từ trước)
                 var users = await _databaseService.GetUsersByIdsAsync(otherMembers.Select(m => m.Key).ToList());
                 var memberOptions = users.ToDictionary(u => u.Id, u => u.DisplayName);
 
-                // Tạo cửa sổ popup chọn admin mới
+                // Tạo popup chọn admin mới
                 var window = new Window
                 {
                     Title = "Chọn admin mới",
@@ -2929,7 +3084,12 @@ namespace UI_Chat_App
                 };
 
                 var stack = new StackPanel { Margin = new Thickness(10) };
-                var label = new TextBlock { Text = "Chọn thành viên để chuyển quyền admin:", Margin = new Thickness(0, 0, 0, 10) };
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Chọn thành viên để chuyển quyền admin:",
+                    Margin = new Thickness(0, 0, 0, 10)
+                });
+
                 var comboBox = new ComboBox
                 {
                     ItemsSource = memberOptions,
@@ -2937,8 +3097,15 @@ namespace UI_Chat_App
                     SelectedValuePath = "Key",
                     Margin = new Thickness(0, 0, 0, 10)
                 };
-                var confirmButton = new Button { Content = "Xác nhận", Height = 30, Width = 100, HorizontalAlignment = HorizontalAlignment.Center };
+                stack.Children.Add(comboBox);
 
+                var confirmButton = new Button
+                {
+                    Content = "Xác nhận",
+                    Height = 30,
+                    Width = 100,
+                    HorizontalAlignment = HorizontalAlignment.Center
+                };
                 confirmButton.Click += (s, args) =>
                 {
                     if (comboBox.SelectedValue is string newAdminId)
@@ -2952,27 +3119,28 @@ namespace UI_Chat_App
                         MessageBox.Show("Vui lòng chọn một thành viên.");
                     }
                 };
-
-                stack.Children.Add(label);
-                stack.Children.Add(comboBox);
                 stack.Children.Add(confirmButton);
+
                 window.Content = stack;
 
                 if (window.ShowDialog() == true && window.Tag is string selectedAdminId)
                 {
                     try
                     {
-                        await _databaseService.ChangeGroupAdminAsync(_selectedGroup.GroupId, currentUserId, selectedAdminId);
-                        await _databaseService.RemoveMemberFromGroupAsync(_selectedGroup.GroupId, currentUserId);
-                        MessageBox.Show("Bạn đã rời nhóm và chuyển quyền admin thành công.");
+                        await _databaseService.ChangeGroupAdminAsync(groupId, currentUserId, selectedAdminId);
+                        await _databaseService.RemoveMemberFromGroupAsync(groupId, currentUserId);
+
                         var newAdminName = users.FirstOrDefault(u => u.Id == selectedAdminId)?.DisplayName ?? "[Người được chọn]";
                         await _databaseService.SendSystemMessageToChatAsync(
-                            _selectedGroup.GroupId,
+                            groupId,
                             $"{App.CurrentUser.DisplayName} đã rời nhóm và chuyển quyền admin cho {newAdminName}."
                         );
+
+                        MessageBox.Show("Bạn đã rời nhóm và chuyển quyền admin thành công.");
+                        _selectedGroup = null;
+
                         await RefreshGroupUIAsync();
                         await RefreshFriendsAndRequestsAsync();
-
                     }
                     catch (Exception ex)
                     {
@@ -2987,15 +3155,17 @@ namespace UI_Chat_App
 
                 try
                 {
-                    await _databaseService.RemoveMemberFromGroupAsync(_selectedGroup.GroupId, currentUserId);
-                    MessageBox.Show("Bạn đã rời nhóm.");
-                    await RefreshGroupUIAsync();
-                    await RefreshFriendsAndRequestsAsync();
+                    await _databaseService.RemoveMemberFromGroupAsync(groupId, currentUserId);
                     await _databaseService.SendSystemMessageToChatAsync(
-                        _selectedGroup.GroupId,
+                        groupId,
                         $"{App.CurrentUser.DisplayName} đã rời nhóm."
                     );
 
+                    MessageBox.Show("Bạn đã rời nhóm.");
+                    _selectedGroup = null;
+
+                    await RefreshGroupUIAsync();
+                    await RefreshFriendsAndRequestsAsync();
                 }
                 catch (Exception ex)
                 {
@@ -3003,6 +3173,7 @@ namespace UI_Chat_App
                 }
             }
         }
+
 
         private async void DeleteGroupButton_Click(object sender, RoutedEventArgs e)
         {
@@ -3144,40 +3315,46 @@ namespace UI_Chat_App
         {
             string newName = ProfileGroupTextBox.Text.Trim();
 
-            if (!string.IsNullOrEmpty(newName) && newName != GroupProfileName.Text)
+            // 🔒 Kiểm tra rỗng/null
+            if (_selectedGroup == null || string.IsNullOrEmpty(newName) || newName == _selectedGroup.Name)
             {
-                try
-                {
-                    // Hiển thị trạng thái loading
-                    SetLoadingState(true);
-
-                    // Cập nhật tên mới cho nhóm
-                    await _databaseService.UpdateGroupNameAsync(_selectedGroup.GroupId, newName);
-
-                    // Cập nhật UI sau khi thành công
-                    GroupProfileName.Text = newName;
-                    ChatWithTextBlock.Text = $"Group: {newName}"; // Cập nhật tiêu đề chat
-
-                    // Gửi thông báo hệ thống
-                    await _databaseService.SendSystemMessageToChatAsync(
-                        _selectedGroup.GroupId,
-                        $"📝 Đã đổi tên nhóm thành '{newName}'"
-                    );
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Lỗi khi cập nhật tên nhóm: {ex.Message}");
-                }
-                finally
-                {
-                    SetLoadingState(false);
-                }
+                GroupProfileName.Visibility = Visibility.Visible;
+                ProfileGroupTextBox.Visibility = Visibility.Collapsed;
+                return;
             }
 
-            // Reset UI
-            GroupProfileName.Visibility = Visibility.Visible;
-            ProfileGroupTextBox.Visibility = Visibility.Collapsed;
+            try
+            {
+                SetLoadingState(true);
+
+                // ✅ Cập nhật trên Firestore
+                await _databaseService.UpdateGroupNameAsync(_selectedGroup.GroupId, newName);
+
+                // ✅ Cập nhật UI
+                _selectedGroup.Name = newName;
+                GroupProfileName.Text = newName;
+                ChatWithTextBlock.Text = $"Group: {newName}";
+
+                await _databaseService.SendSystemMessageToChatAsync(
+                    _selectedGroup.GroupId,
+                    $"📝 Đã đổi tên nhóm thành '{newName}'"
+                );
+
+                await UpdateGroupHeaderAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi khi cập nhật tên nhóm: {ex.Message}");
+            }
+            finally
+            {
+                SetLoadingState(false);
+                GroupProfileName.Visibility = Visibility.Visible;
+                ProfileGroupTextBox.Visibility = Visibility.Collapsed;
+            }
         }
+
+
 
         private void CancelGroupNameEdit()
         {
@@ -3190,7 +3367,6 @@ namespace UI_Chat_App
         {
             if (_selectedGroup == null) return;
 
-            // Kiểm tra quyền admin
             bool isAdmin = _selectedGroup.Members.TryGetValue(App.CurrentUser.Id, out var role) &&
                            role.Equals("admin", StringComparison.OrdinalIgnoreCase);
 
@@ -3210,31 +3386,36 @@ namespace UI_Chat_App
             {
                 try
                 {
-                    // Hiển thị trạng thái loading
                     SetLoadingState(true);
 
-                    // Upload ảnh lên S3
+                    // ✅ Upload ảnh lên S3
                     string newAvatarUrl = await _databaseService.UploadFileToS3Async(
                         openFileDialog.FileName,
                         "group-avatars"
                     );
 
-                    // Cập nhật avatar trong database
+                    // ✅ Cập nhật Firestore
                     await _databaseService.UpdateGroupAvatarAsync(_selectedGroup.GroupId, newAvatarUrl);
 
-                    // Load and display new image
-                    BitmapImage bitmap = new BitmapImage();
+                    // ✅ Cập nhật local
+                    _selectedGroup.Avatar = newAvatarUrl;
+
+                    // ✅ Hiển thị ảnh mới ngay
+                    var bitmap = new BitmapImage();
                     bitmap.BeginInit();
                     bitmap.UriSource = new Uri(newAvatarUrl);
                     bitmap.CacheOption = BitmapCacheOption.OnLoad;
                     bitmap.EndInit();
                     GroupProfileAvatar.Source = bitmap;
 
-                    // Gửi thông báo hệ thống
+                    // ✅ Gửi thông báo hệ thống
                     await _databaseService.SendSystemMessageToChatAsync(
                         _selectedGroup.GroupId,
                         "🖼️ Đã cập nhật ảnh đại diện nhóm"
                     );
+
+                    // ✅ Cập nhật UI thêm nếu cần
+                    await UpdateGroupHeaderAsync();
                 }
                 catch (Exception ex)
                 {
@@ -3246,6 +3427,7 @@ namespace UI_Chat_App
                 }
             }
         }
+
 
         private void SetLoadingState(bool isLoading)
         {
