@@ -779,6 +779,57 @@ namespace ChatApp.Services
             Console.WriteLine("Stopped listening to friend data");
         }
 
+        private Dictionary<string, FirestoreChangeListener> _individualFriendListeners = new Dictionary<string, FirestoreChangeListener>();
+
+        public async Task ListenToEachFriendAsync(List<string> friendIds, Action<UserData> onUserChanged)
+        {
+            // Hủy các listener không còn trong friendIds
+            var obsolete = _individualFriendListeners.Keys.Except(friendIds).ToList();
+            foreach (var id in obsolete)
+            {
+                if (_individualFriendListeners.TryGetValue(id, out var listener))
+                {
+                    await listener.StopAsync();
+                    _individualFriendListeners.Remove(id);
+                }
+            }
+
+            // Gắn listener cho mỗi bạn mới
+            foreach (var id in friendIds)
+            {
+                if (_individualFriendListeners.ContainsKey(id)) continue;
+
+                var docRef = _firestoreDb.Collection("users").Document(id);
+                var listener = docRef.Listen(snapshot =>
+                {
+                    if (!snapshot.Exists) return;
+
+                    var dict = snapshot.ToDictionary();
+
+                    var user = new UserData
+                    {
+                        Id = snapshot.Id,
+                        DisplayName = dict.TryGetValue("DisplayName", out var d) ? d as string : null,
+                        Email = dict.TryGetValue("Email", out var e) ? e as string : null,
+                        Avatar = dict.TryGetValue("Avatar", out var a) ? a as string : null,
+                        IsOnline = dict.TryGetValue("IsOnline", out var o) && o is bool online && online
+                    };
+
+                    onUserChanged?.Invoke(user);
+                });
+
+                _individualFriendListeners[id] = listener;
+            }
+        }
+
+        public async Task StopListeningToEachFriendAsync()
+        {
+            foreach (var listener in _individualFriendListeners.Values)
+                await listener.StopAsync();
+
+            _individualFriendListeners.Clear();
+        }
+
 
         public async Task<List<NotificationData>> GetNotificationsAsync(string userId)
         {

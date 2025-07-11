@@ -102,23 +102,24 @@ namespace UI_Chat_App
             });
 
             // Lắng nghe thay đổi danh sách bạn bè
-            await _databaseService.ListenToFriendsAsync(App.CurrentUser.Id, (friend, changeType) =>
-            {
-                Dispatcher.Invoke(() =>
-                {
-                    switch (changeType)
-                    {
-                        case Google.Cloud.Firestore.DocumentChange.Type.Added:
-                        case Google.Cloud.Firestore.DocumentChange.Type.Modified:
-                            HandleFriendChanged(friend);
-                            break;
+            //await _databaseService.ListenToFriendsAsync(App.CurrentUser.Id, (friend, changeType) =>
+            //{
+            //    Dispatcher.Invoke(() =>
+            //    {
+            //        switch (changeType)
+            //        {
+            //            case Google.Cloud.Firestore.DocumentChange.Type.Added:
+            //            case Google.Cloud.Firestore.DocumentChange.Type.Modified:
+            //                HandleFriendChanged(friend);
+            //                break;
 
-                        case Google.Cloud.Firestore.DocumentChange.Type.Removed:
-                            HandleFriendRemoved(friend);
-                            break;
-                    }
-                });
-            });
+            //            case Google.Cloud.Firestore.DocumentChange.Type.Removed:
+            //                HandleFriendRemoved(friend);
+            //                break;
+            //        }
+            //    });
+            //});
+            StartListeningToAllFriends();
             try
             {
                 if (!AgoraService.Instance.Initialize())
@@ -318,8 +319,8 @@ namespace UI_Chat_App
 
             Dispatcher.Invoke(() =>
             {
-                UserListBox.ItemsSource = null;
-                UserListBox.ItemsSource = _chatrooms;
+                if (UserListBox.ItemsSource != _chatrooms)
+                    UserListBox.ItemsSource = _chatrooms;
             });
         }
 
@@ -342,10 +343,10 @@ namespace UI_Chat_App
                         if (string.IsNullOrEmpty(user.Avatar))
                             user.Avatar = "Icons/user.png";
 
-                        _users.Add(user);
-
-                        // Cập nhật lại danh sách phòng chat
-                        _chatrooms.Add(user);
+                        if (!_users.Any(u => u.Id == user.Id))
+                            _users.Add(user);
+                        if (!_chatrooms.Any(u => (u as UserData)?.Id == user.Id))
+                            _chatrooms.Add(user);
                     }
                 });
             }
@@ -363,6 +364,66 @@ namespace UI_Chat_App
                     UserListBox.ItemsSource = _chatrooms;
             });
         }
+
+        private List<string> _previousFriendIds = new List<string>();
+        private Dictionary<string, FirestoreChangeListener> _individualFriendListeners = new Dictionary<string, FirestoreChangeListener>();
+
+        private async void StartListeningToAllFriends()
+        {
+            await _databaseService.StopFriendListenersAsync(); // Dừng lắng nghe cũ nếu có
+
+            // 1. Lắng nghe danh sách bạn bè
+            await _databaseService.ListenToFriendsAsync(App.CurrentUser.Id, async (friend, changeType) =>
+            {
+                await Dispatcher.InvokeAsync(async () =>
+                {
+                    switch (changeType)
+                    {
+                        case Google.Cloud.Firestore.DocumentChange.Type.Added:
+                        case Google.Cloud.Firestore.DocumentChange.Type.Modified:
+                            HandleFriendChanged(friend);
+                            break;
+
+                        case Google.Cloud.Firestore.DocumentChange.Type.Removed:
+                            HandleFriendRemoved(friend);
+                            break;
+                    }
+
+                    // 2. Lấy danh sách ID bạn bè mới nhất
+                    var newFriendIds = _users.Select(f => f.Id).Distinct().ToList();
+
+                    // 3. Nếu có sự khác biệt thì cập nhật listener từng bạn
+                    if (!_previousFriendIds.SequenceEqual(newFriendIds))
+                    {
+                        _previousFriendIds = newFriendIds;
+
+                        await _databaseService.ListenToEachFriendAsync(newFriendIds, async user =>
+                        {
+                            await Dispatcher.InvokeAsync(() =>
+                            {
+                                var existing = _users.FirstOrDefault(f => f.Id == user.Id);
+                                if (existing != null)
+                                {
+                                    existing.Avatar = user.Avatar;
+                                    existing.DisplayName = user.DisplayName;
+                                    existing.IsOnline = user.IsOnline;
+                                }
+
+                                if (_selectedUser?.Id == user.Id)
+                                {
+                                    ProfileAvatar.Source = LoadAvatar(user.Avatar);
+                                    ProfileUsername.Text = $"Username: {user.DisplayName}";
+                                    ProfileStatus.Text = $"Status: {(user.IsOnline ? "Online" : "Offline")}";
+                                }
+
+                                UpdateChatroomList();
+                            });
+                        });
+                    }
+                });
+            });
+        }
+
 
         private async Task RefreshFriendsAndRequestsAsync()
         {
@@ -1295,7 +1356,6 @@ namespace UI_Chat_App
 
             var selectedItem = UserListBox.SelectedItem;
 
-            // 🛑 Trước khi chuyển người hoặc nhóm, tắt typing và timer cũ
             if (_selectedUser != null)
             {
                 await SetTypingStatusAsync(false);
@@ -1303,7 +1363,6 @@ namespace UI_Chat_App
                 _isTyping = false;
             }
 
-            // 🛑 Hủy lắng nghe typing cũ nếu có
             if (_typingStatusListener != null)
             {
                 await _typingStatusListener.StopAsync();
@@ -1314,34 +1373,28 @@ namespace UI_Chat_App
             {
                 EmptyPromptTextBlock.Visibility = Visibility.Collapsed;
 
-                // --- Xử lý chat cá nhân ---
                 if ((newSelectedUser != _selectedUser && newSelectedUser != null) || _currentChatRoomId == null)
                 {
                     _selectedUser = newSelectedUser;
                     _selectedGroup = null;
+                    _isUserProfileVisible = true;
+                    _isShowingMyProfile = false;
 
                     bool areFriends = await _databaseService.AreFriendsAsync(App.CurrentUser.Id, _selectedUser.Id);
                     if (!areFriends)
                     {
-                        MessageBox.Show("You can only chat with friends. Please add this user as a friend first.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+                        MessageBox.Show("You can only chat with friends.");
                         ResetChatUI();
                         return;
                     }
 
-                    GroupProfilePanel.Visibility = Visibility.Collapsed;
-                    UserProfilePanel.Visibility = Visibility.Visible;
-                    UserProfileColumn.Width = new GridLength(230);
-
-                    ChatWithTextBlock.Text = $"Chat with {_selectedUser.DisplayName}";
-                    ProfileUsername.Text = $"Username: {_selectedUser.DisplayName}";
-                    ProfileEmail.Text = $"Email: {_selectedUser.Email}";
-                    ProfileStatus.Text = $"Status: {(_selectedUser.IsOnline ? "Online" : "Offline")}";
-                    ProfileAvatar.Source = LoadAvatar(_selectedUser.Avatar);
+                    ShowUserProfile(_selectedUser); // ✅ gọi hàm có animation
 
                     _currentChatRoomId = _databaseService.GenerateChatRoomId(App.CurrentUser.Id, _selectedUser.Id);
                     _lastMessageTimestamp = null;
                     _messages.Clear();
                     MessagesStackPanel.Children.Clear();
+                    MessageTextBox.Clear();
 
                     await RefreshNotificationAsync();
                     await _databaseService.StopListeningToMessagesAsync();
@@ -1351,7 +1404,7 @@ namespace UI_Chat_App
                     EditUsernameButton.Visibility = Visibility.Collapsed;
                     EditGroupNameButton.Visibility = Visibility.Collapsed;
 
-                    StartListeningToTyping(); // ✅ Lắng nghe typing sau khi gán _selectedUser
+                    StartListeningToTyping();
                 }
             }
             else if (selectedItem is GroupData selectedGroup)
@@ -1360,54 +1413,28 @@ namespace UI_Chat_App
 
                 _selectedGroup = await _databaseService.GetGroupAsync(selectedGroup.GroupId);
                 _selectedUser = null;
+                _isUserProfileVisible = true;
+                _isShowingMyProfile = false;
 
-                GroupMembersList.ItemsSource = null;
-                GroupMembersList.Visibility = Visibility.Collapsed;
-                PendingMembersListBox.ItemsSource = null;
-                PendingMembersListBox.Visibility = Visibility.Collapsed;
-                PendingMembersLabel.Visibility = Visibility.Collapsed;
-                ApproveSelectedButton.Visibility = Visibility.Collapsed;
-                RejectSelectedButton.Visibility = Visibility.Collapsed;
-                FriendCheckboxList.ItemsSource = null;
-                FriendCheckboxList.Visibility = Visibility.Collapsed;
-                ConfirmInviteButton.Visibility = Visibility.Collapsed;
-                InviteFriendLabel.Visibility = Visibility.Collapsed;
-
-                var Admin = await GetUserNameById(_selectedGroup.CreatedBy);
-
-                bool isAdmin = _selectedGroup.Members.TryGetValue(App.CurrentUser.Id, out var role)
-                               && role.Equals("admin", StringComparison.OrdinalIgnoreCase);
-                DeleteGroupButton.Visibility = isAdmin ? Visibility.Visible : Visibility.Collapsed;
-
-                UserProfilePanel.Visibility = Visibility.Collapsed;
-                GroupProfilePanel.Visibility = Visibility.Visible;
-                UserProfileColumn.Width = new GridLength(230);
-
-                ChatWithTextBlock.Text = $"Group: {_selectedGroup.Name}";
-                GroupProfileName.Text = _selectedGroup.Name;
-                GroupCreatedBy.Text = $"Admin: {Admin}";
-                GroupMemberCount.Text = $"Members: {_selectedGroup.MemberCount} members";
-                GroupProfileAvatar.Source = LoadAvatar(_selectedGroup.Avatar);
+                await ShowGroupProfileAsync(); // ✅ gọi hàm có animation
 
                 _currentChatRoomId = _selectedGroup.GroupId;
                 _lastMessageTimestamp = null;
                 _messages.Clear();
                 MessagesStackPanel.Children.Clear();
+                MessageTextBox.Clear();
 
                 await RefreshNotificationAsync();
                 await _databaseService.StopListeningToMessagesAsync();
                 await LoadInitialMessagesAsync(_currentChatRoomId);
                 await StartListeningForMessages(_currentChatRoomId);
 
-
-
-                // Hiển thị nút chỉnh sửa tên nhóm nếu là admin
+                bool isAdmin = _selectedGroup.Members.TryGetValue(App.CurrentUser.Id, out var role)
+                               && role.Equals("admin", StringComparison.OrdinalIgnoreCase);
                 EditGroupNameButton.Visibility = isAdmin ? Visibility.Visible : Visibility.Collapsed;
+                DeleteGroupButton.Visibility = isAdmin ? Visibility.Visible : Visibility.Collapsed;
 
-                // Ẩn nút chỉnh sửa username
                 EditUsernameButton.Visibility = Visibility.Collapsed;
-
-                // ✅ Ẩn typing nếu đang từ user chuyển qua group
                 TypingStatusTextBlock.Text = "";
                 TypingStatusTextBlock.Visibility = Visibility.Collapsed;
             }
@@ -1416,6 +1443,7 @@ namespace UI_Chat_App
                 ResetChatUI();
             }
         }
+
 
 
 
@@ -1822,10 +1850,10 @@ namespace UI_Chat_App
 
                     await Dispatcher.InvokeAsync(() =>
                     {
-                        App.CurrentUser.RaisePropertyChanged(nameof(App.CurrentUser.Avatar));
                         UsernameTextBlock.Text = App.CurrentUser.DisplayName;
                         ProfileUsername.Text = $"Username: {App.CurrentUser.DisplayName}";
                         ProfileEmail.Text = $"Email: {App.CurrentUser.Email}";
+                        ProfileAvatar.Source = LoadAvatar(App.CurrentUser.Avatar); // ✅ đảm bảo load ảnh mới
                     });
 
                     await RefreshFriendsAndRequestsAsync();
@@ -1838,6 +1866,7 @@ namespace UI_Chat_App
                 MessageBox.Show($"Failed to change avatar: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
 
         private CustomPopupPlacement[] NotificationPopup_PlacementCallback(Size popupSize, Size targetSize, Point offset)
         {
@@ -2138,34 +2167,123 @@ namespace UI_Chat_App
         }
 
         private bool _isUserProfileVisible = false;
+        private bool _isShowingMyProfile = false;
 
         private async void Optional_Click(object sender, RoutedEventArgs e)
         {
             if (!_isUserProfileVisible)
             {
-                // Hiện lên
-                UserProfilePanel.Visibility = Visibility.Visible;
-                UserProfileColumn.Width = new GridLength(230);
-
-                var showStoryboard = (Storyboard)this.Resources["SlideInUserProfile"];
-                showStoryboard.Begin(UserProfilePanel);
+                if (_selectedGroup != null)
+                {
+                    await ShowGroupProfileAsync();
+                }
+                else if (_selectedUser != null)
+                {
+                    ShowUserProfile(_selectedUser);
+                }
+                else
+                {
+                    ShowMyProfile();
+                }
 
                 _isUserProfileVisible = true;
+                _isShowingMyProfile = false;
+            }
+            else if (!_isShowingMyProfile)
+            {
+                ShowMyProfile();
+                _isShowingMyProfile = true;
             }
             else
             {
-                // Chạy ẩn
-                var hideStoryboard = (Storyboard)this.Resources["SlideOutUserProfile"];
-                hideStoryboard.Begin(UserProfilePanel);
-
-                // Đợi animation hoàn tất rồi ẩn
-                await Task.Delay(200);
-                UserProfilePanel.Visibility = Visibility.Collapsed;
-                UserProfileColumn.Width = new GridLength(0);
-
+                await HideProfilePanelAsync();
                 _isUserProfileVisible = false;
+                _isShowingMyProfile = false;
             }
         }
+
+
+
+        private async Task ShowGroupProfileAsync()
+        {
+            if (_selectedGroup == null) return;
+
+            var adminName = await GetUserNameById(_selectedGroup.CreatedBy);
+
+            ChatWithTextBlock.Text = $"Group: {_selectedGroup.Name}";
+            GroupProfileName.Text = _selectedGroup.Name;
+            GroupCreatedBy.Text = $"Admin: {adminName}";
+            GroupMemberCount.Text = $"Members: {_selectedGroup.MemberCount} members";
+            GroupProfileAvatar.Source = LoadAvatar(_selectedGroup.Avatar);
+
+            UserProfilePanel.Visibility = Visibility.Collapsed;
+            GroupProfilePanel.Visibility = Visibility.Visible;
+            UserProfileColumn.Width = new GridLength(230);
+
+            var showStoryboard = (Storyboard)this.Resources["SlideInUserProfile"];
+            showStoryboard.Begin(GroupProfilePanel);
+
+            _isUserProfileVisible = true;
+            _isShowingMyProfile = false;
+        }
+
+        private void ShowUserProfile(UserData user)
+        {
+            ChatWithTextBlock.Text = $"Chat with {user.DisplayName}";
+            ProfileUsername.Text = $"Username: {user.DisplayName}";
+            ProfileEmail.Text = $"Email: {user.Email}";
+            ProfileStatus.Text = $"Status: {(user.IsOnline ? "Online" : "Offline")}";
+            ProfileAvatar.Source = LoadAvatar(user.Avatar);
+
+            GroupProfilePanel.Visibility = Visibility.Collapsed;
+            UserProfilePanel.Visibility = Visibility.Visible;
+            UserProfileColumn.Width = new GridLength(230);
+            EditUsernameButton.Visibility = Visibility.Collapsed;
+
+            var showStoryboard = (Storyboard)this.Resources["SlideInUserProfile"];
+            showStoryboard.Begin(UserProfilePanel);
+
+            _isUserProfileVisible = true;
+            _isShowingMyProfile = false;
+        }
+
+        private void ShowMyProfile()
+        {
+            var me = App.CurrentUser;
+
+            ProfileUsername.Text = $"Username: {me.DisplayName}";
+            ProfileEmail.Text = $"Email: {me.Email}";
+            ProfileStatus.Text = $"Status: {(me.IsOnline ? "Online" : "Offline")}";
+            ProfileAvatar.Source = LoadAvatar(me.Avatar);
+
+            GroupProfilePanel.Visibility = Visibility.Collapsed;
+            UserProfilePanel.Visibility = Visibility.Visible;
+            UserProfileColumn.Width = new GridLength(230);
+
+            var showStoryboard = (Storyboard)this.Resources["SlideInUserProfile"];
+            showStoryboard.Begin(UserProfilePanel);
+
+            EditUsernameButton.Visibility = Visibility.Visible; // ✅ Hiện nút edit tên
+        }
+
+
+        private async Task HideProfilePanelAsync()
+        {
+            var hideStoryboard = (Storyboard)this.Resources["SlideOutUserProfile"];
+            hideStoryboard.Begin(UserProfilePanel);
+            hideStoryboard.Begin(GroupProfilePanel);
+
+            await Task.Delay(200);
+
+            UserProfilePanel.Visibility = Visibility.Collapsed;
+            GroupProfilePanel.Visibility = Visibility.Collapsed;
+            UserProfileColumn.Width = new GridLength(0);
+
+            _isUserProfileVisible = false;
+            _isShowingMyProfile = false;
+        }
+
+
 
 
         private bool isSearchVisible = false;
@@ -2620,6 +2738,16 @@ namespace UI_Chat_App
                 return;
             }
 
+            if (_selectedUser != null)
+            {
+                bool isBlocked = await _databaseService.IsBlockedBetweenUsers(App.CurrentUser.Id, _selectedUser.Id);
+                if (isBlocked)
+                {
+                    MessageBox.Show("Bạn không thể gửi ảnh vì đã bị chặn hoặc đã chặn người này.", "Bị chặn", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+            }
+
             try
             {
                 var openFileDialog = new Microsoft.Win32.OpenFileDialog
@@ -2676,6 +2804,17 @@ namespace UI_Chat_App
                 return;
             }
 
+            if (_selectedUser != null)
+            {
+                bool isBlocked = await _databaseService.IsBlockedBetweenUsers(App.CurrentUser.Id, _selectedUser.Id);
+                if (isBlocked)
+                {
+                    MessageBox.Show("Bạn không thể gửi file vì đã bị chặn hoặc đã chặn người này.", "Bị chặn", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+            }
+
+
             try
             {
                 var openFileDialog = new Microsoft.Win32.OpenFileDialog
@@ -2730,6 +2869,17 @@ namespace UI_Chat_App
                 MessageBox.Show("Hãy chọn người dùng hoặc nhóm để gửi tin nhắn thoại.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
+
+            if (_selectedUser != null)
+            {
+                bool isBlocked = await _databaseService.IsBlockedBetweenUsers(App.CurrentUser.Id, _selectedUser.Id);
+                if (isBlocked)
+                {
+                    MessageBox.Show("Bạn không thể gửi tin nhắn thoại vì đã bị chặn hoặc đã chặn người này.", "Bị chặn", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+            }
+
 
             try
             {
@@ -2800,6 +2950,17 @@ namespace UI_Chat_App
                 MessageBox.Show("Hãy chọn người dùng hoặc nhóm để gửi emoji.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
+
+            if (_selectedUser != null)
+            {
+                bool isBlocked = await _databaseService.IsBlockedBetweenUsers(App.CurrentUser.Id, _selectedUser.Id);
+                if (isBlocked)
+                {
+                    MessageBox.Show("Bạn không thể gửi emoji vì đã bị chặn hoặc đã chặn người này.", "Bị chặn", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+            }
+
 
             try
             {
