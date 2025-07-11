@@ -923,7 +923,7 @@
                                             </DataTemplate>
                                         </ListBox.ItemTemplate>
                                     </ListBox>
-                                    <Button Content="View Sent Friend Requests" Click="ViewSentFriendRequests_Click" Margin="5" Style="{StaticResource WindowButtonStyle}"/>
+                                    <!--<Button Content="View Sent Friend Requests" Click="ViewSentFriendRequests_Click" Margin="5" Style="{StaticResource WindowButtonStyle}"/>-->
 
                                     <!-- Thêm danh sách lời mời đã gửi -->
                                     <ListBox x:Name="SentFriendRequestsListBox" Style="{StaticResource RoundedListBoxStyle}" Margin="5" HorizontalContentAlignment="Stretch">

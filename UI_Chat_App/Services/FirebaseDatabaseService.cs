@@ -469,21 +469,46 @@ namespace ChatApp.Services
         {
             try
             {
-                // Xóa mối quan hệ bạn bè ở cả 2 phía
                 var currentUserFriendRef = _firestoreDb
                     .Collection("users").Document(currentUserId)
                     .Collection("friends").Document(targetUserId);
+
                 var targetUserFriendRef = _firestoreDb
                     .Collection("users").Document(targetUserId)
                     .Collection("friends").Document(currentUserId);
 
+                // Xóa lời mời kết bạn còn tồn tại
+                var sentRequestFromCurrentUser = _firestoreDb
+                    .Collection("users").Document(currentUserId)
+                    .Collection("sentFriendRequests").Document(targetUserId);
+
+                var receivedRequestOnTargetUser = _firestoreDb
+                    .Collection("users").Document(targetUserId)
+                    .Collection("friendRequests").Document(currentUserId);
+
+                var sentRequestFromTargetUser = _firestoreDb
+                    .Collection("users").Document(targetUserId)
+                    .Collection("sentFriendRequests").Document(currentUserId);
+
+                var receivedRequestOnCurrentUser = _firestoreDb
+                    .Collection("users").Document(currentUserId)
+                    .Collection("friendRequests").Document(targetUserId);
+
+                // Bắt đầu batch
                 WriteBatch batch = _firestoreDb.StartBatch();
+
                 batch.Delete(currentUserFriendRef);
                 batch.Delete(targetUserFriendRef);
 
-                // Xóa toàn bộ tin nhắn giữa hai người dùng
+                // Xóa mọi lời mời kết bạn giữa hai người
+                batch.Delete(sentRequestFromCurrentUser);
+                batch.Delete(receivedRequestOnTargetUser);
+                batch.Delete(sentRequestFromTargetUser);
+                batch.Delete(receivedRequestOnCurrentUser);
+
+                // Xoá tin nhắn
                 string chatRoomId = GenerateChatRoomId(currentUserId, targetUserId);
-                CollectionReference messagesRef = _firestoreDb
+                var messagesRef = _firestoreDb
                     .Collection("messages").Document(chatRoomId)
                     .Collection("messages");
 
@@ -493,19 +518,19 @@ namespace ChatApp.Services
                     batch.Delete(doc.Reference);
                 }
 
-                // Xóa document cha của chatRoom (nếu không cần giữ lại)
-                var chatRoomDoc = _firestoreDb.Collection("messages").Document(chatRoomId);
-                batch.Delete(chatRoomDoc);
+                batch.Delete(_firestoreDb.Collection("messages").Document(chatRoomId));
 
                 await batch.CommitAsync();
 
-                Console.WriteLine($"Removed friend and deleted all messages between {currentUserId} and {targetUserId}");
+                Console.WriteLine($"Removed friend + cleaned up everything between {currentUserId} and {targetUserId}");
             }
             catch (Exception ex)
             {
                 throw new Exception($"Failed to remove friend and delete messages: {ex.Message}", ex);
             }
         }
+
+
 
         public async Task SetFriendPriorityAsync(string userId, string friendId, int priority)
         {

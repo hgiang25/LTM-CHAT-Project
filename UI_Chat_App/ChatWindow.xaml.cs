@@ -101,54 +101,55 @@ namespace UI_Chat_App
                 });
             });
             // Lắng nghe thay đổi danh sách bạn bè                     
-            StartListeningToAllFriends();
+            //StartListeningToAllFriends();                        
+            await _databaseService.ListenToFriendsAsync(App.CurrentUser.Id, async (friend, changeType) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    switch (changeType)
+                    {
+                        case Google.Cloud.Firestore.DocumentChange.Type.Added:
+                        case Google.Cloud.Firestore.DocumentChange.Type.Modified:
+                            HandleFriendChanged(friend);
+                            break;
+
+                        case Google.Cloud.Firestore.DocumentChange.Type.Removed:
+                            HandleFriendRemoved(friend);
+                            break;
+                    }
+                });
+
+                // Delay nhẹ để chắc chắn _users đã được cập nhật
+                await Task.Delay(100);
+
+                var friendIds = _users.Select(u => u.Id).Distinct().ToList();
+
+                await _databaseService.ListenToEachFriendAsync(friendIds, async user =>
+{
+                    Dispatcher.Invoke(() =>
+                    {
+                        var existing = _users.FirstOrDefault(f => f.Id == user.Id);
+                        if (existing != null)
+                        {
+                            existing.Avatar = user.Avatar;
+                            existing.DisplayName = user.DisplayName;
+                            existing.IsOnline = user.IsOnline;
+                        }
+
+                        if (_selectedUser?.Id == user.Id)
+                        {
+                            ProfileAvatar.Source = LoadAvatar(user.Avatar);
+                            ProfileUsername.Text = $"Username: {user.DisplayName}";
+                            ProfileStatus.Text = $"Status: {(user.IsOnline ? "Online" : "Offline")}";
+                        }
+
+                        UpdateChatroomList();
+                    });
+                });
+            });
+
         }
-            //try
-            //{
-            //    if (!AgoraService.Instance.Initialize())
-            //    {
-            //        System.Windows.MessageBox.Show("Không thể khởi tạo dịch vụ gọi điện. Chức năng gọi sẽ không hoạt động.", "Lỗi Khởi Tạo");
-            //    }
-            //    else if (!AgoraService.Instance.HasRequiredDevices())
-            //    {
-            //        System.Windows.MessageBox.Show("Không tìm thấy camera hoặc microphone. Vui lòng kiểm tra lại thiết bị.", "Thiếu Thiết Bị");
-            //    }
-                
-
-            //    _databaseService.ListenForIncomingCall(App.CurrentUser.Id, (incomingCall) =>
-            //    {
-            //        Dispatcher.Invoke(async () => // ✅ Chuyển sang async
-            //        {
-            //            if (AgoraService.Instance.IsInCall) return;
-
-            //            // 💡 KIỂM TRA LẠI TRẠNG THÁI TRƯỚC KHI HỎI
-            //            var currentCallState = await _databaseService.GetCallAsync(incomingCall.ChannelName);
-            //            if (currentCallState == null || currentCallState.Status != "calling")
-            //            {
-            //                // Cuộc gọi đã bị hủy hoặc kết thúc -> không làm gì cả
-            //                return;
-            //            }
-
-            //            var result = System.Windows.MessageBox.Show($"{incomingCall.CallerName} đang gọi bạn. Trả lời?", "Cuộc gọi đến", MessageBoxButton.YesNo, MessageBoxImage.Question);
-
-            //            if (result == MessageBoxResult.Yes)
-            //            {
-            //                await _databaseService.UpdateCallStatusAsync(incomingCall.ChannelName, "ongoing");
-            //                CallWindow callWindow = new CallWindow(incomingCall, false); // false = người nhận
-            //                callWindow.Show();
-            //            }
-            //            else
-            //            {
-            //                await _databaseService.UpdateCallStatusAsync(incomingCall.ChannelName, "rejected");
-            //            }
-            //        });
-            //    });
-            //}
-            //catch (Exception ex)
-            //{
-            //    MessageBox.Show($"Lỗi khởi tạo tính năng gọi điện: {ex.Message}");
-            //}        
-
+        
         private async Task InitializeChatAsync()
         {
             try
@@ -347,64 +348,60 @@ namespace UI_Chat_App
             });
         }
 
-        private List<string> _previousFriendIds = new List<string>();
-        private Dictionary<string, FirestoreChangeListener> _individualFriendListeners = new Dictionary<string, FirestoreChangeListener>();
+        private List<string> _previousFriendIds = new List<string>();        
 
         private async void StartListeningToAllFriends()
         {
-            await _databaseService.StopFriendListenersAsync(); // Dừng lắng nghe cũ nếu có
+            await _databaseService.StopFriendListenersAsync();
 
-            // 1. Lắng nghe danh sách bạn bè
             await _databaseService.ListenToFriendsAsync(App.CurrentUser.Id, async (friend, changeType) =>
             {
-                await Dispatcher.InvokeAsync(async () =>
+                // Cập nhật UI trước
+                switch (changeType)
                 {
-                    switch (changeType)
+                    case Google.Cloud.Firestore.DocumentChange.Type.Added:
+                    case Google.Cloud.Firestore.DocumentChange.Type.Modified:
+                        Dispatcher.Invoke(() => HandleFriendChanged(friend));
+                        break;
+
+                    case Google.Cloud.Firestore.DocumentChange.Type.Removed:
+                        Dispatcher.Invoke(() => HandleFriendRemoved(friend));
+                        break;
+                }
+
+                // Sau khi cập nhật UI, lấy danh sách ID bạn bè
+                var friendIds = _users.Select(u => u.Id).Distinct().ToList();
+
+                if (!_previousFriendIds.SequenceEqual(friendIds))
+                {
+                    _previousFriendIds = friendIds;
+
+                    await _databaseService.ListenToEachFriendAsync(friendIds, async user =>
                     {
-                        case Google.Cloud.Firestore.DocumentChange.Type.Added:
-                        case Google.Cloud.Firestore.DocumentChange.Type.Modified:
-                            HandleFriendChanged(friend);
-                            break;
-
-                        case Google.Cloud.Firestore.DocumentChange.Type.Removed:
-                            HandleFriendRemoved(friend);
-                            break;
-                    }
-
-                    // 2. Lấy danh sách ID bạn bè mới nhất
-                    var newFriendIds = _users.Select(f => f.Id).Distinct().ToList();
-
-                    // 3. Nếu có sự khác biệt thì cập nhật listener từng bạn
-                    if (!_previousFriendIds.SequenceEqual(newFriendIds))
-                    {
-                        _previousFriendIds = newFriendIds;
-
-                        await _databaseService.ListenToEachFriendAsync(newFriendIds, async user =>
+                        Dispatcher.Invoke(() =>
                         {
-                            await Dispatcher.InvokeAsync(() =>
+                            var existing = _users.FirstOrDefault(f => f.Id == user.Id);
+                            if (existing != null)
                             {
-                                var existing = _users.FirstOrDefault(f => f.Id == user.Id);
-                                if (existing != null)
-                                {
-                                    existing.Avatar = user.Avatar;
-                                    existing.DisplayName = user.DisplayName;
-                                    existing.IsOnline = user.IsOnline;
-                                }
+                                existing.Avatar = user.Avatar;
+                                existing.DisplayName = user.DisplayName;
+                                existing.IsOnline = user.IsOnline;
+                            }
 
-                                if (_selectedUser?.Id == user.Id)
-                                {
-                                    ProfileAvatar.Source = LoadAvatar(user.Avatar);
-                                    ProfileUsername.Text = $"Username: {user.DisplayName}";
-                                    ProfileStatus.Text = $"Status: {(user.IsOnline ? "Online" : "Offline")}";
-                                }
+                            if (_selectedUser?.Id == user.Id)
+                            {
+                                ProfileAvatar.Source = LoadAvatar(user.Avatar);
+                                ProfileUsername.Text = $"Username: {user.DisplayName}";
+                                ProfileStatus.Text = $"Status: {(user.IsOnline ? "Online" : "Offline")}";
+                            }
 
-                                UpdateChatroomList();
-                            });
+                            UpdateChatroomList();
                         });
-                    }
-                });
+                    });
+                }
             });
         }
+
 
 
         private async Task RefreshFriendsAndRequestsAsync()
