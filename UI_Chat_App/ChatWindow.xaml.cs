@@ -2809,7 +2809,7 @@ namespace UI_Chat_App
                     var message = new MessageData
                     {
                         SenderId = App.CurrentUser.Id,
-                        ReceiverId = _selectedUser.Id,
+                        ReceiverId = _selectedUser?.Id,
                         Content = emojiKey,
                         Timestamp = timestamp,
                         MessageType = "Emoji"

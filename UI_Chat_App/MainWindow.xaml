@@ -84,7 +84,6 @@
                          GotFocus="PasswordBox_GotFocus"
                          LostFocus="PasswordBox_LostFocus"
                          PasswordChanged="PasswordBox_PasswordChanged"
-                         Padding="5,0"
                          Tag="Your password..."
                          Visibility="Visible"/>
 
