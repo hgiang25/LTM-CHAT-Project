@@ -1472,44 +1472,47 @@ namespace ChatApp.Services
 
         public async Task ListenToEachUserGroupAsync(List<string> groupIds, Action<GroupData> onGroupChanged)
         {
-            // Stop previous listeners
-            foreach (var listener in _individualGroupListeners.Values)
-                await listener.StopAsync();
+            // Dừng lắng nghe những group cũ không còn theo dõi
+            var obsolete = _individualGroupListeners.Keys.Except(groupIds).ToList();
+            foreach (var groupId in obsolete)
+            {
+                if (_individualGroupListeners.TryGetValue(groupId, out var oldListener))
+                {
+                    await oldListener.StopAsync();
+                    _individualGroupListeners.Remove(groupId);
+                }
+            }
 
-            _individualGroupListeners.Clear();
-
+            // Bắt đầu lắng nghe các group mới
             foreach (var groupId in groupIds)
             {
+                if (_individualGroupListeners.ContainsKey(groupId)) continue;
+
                 var docRef = _firestoreDb.Collection("groups").Document(groupId);
                 var listener = docRef.Listen(snapshot =>
                 {
                     if (!snapshot.Exists) return;
 
-                    var data = snapshot.ToDictionary();
-
-                    var members = snapshot.ContainsField("members")
-                        ? snapshot.GetValue<Dictionary<string, object>>("members")
-                        : new Dictionary<string, object>();
-
-                    var pending = snapshot.ContainsField("pending members")
-                        ? snapshot.GetValue<Dictionary<string, object>>("pending members")
-                        : new Dictionary<string, object>();
-
-                    Timestamp createdAt = Timestamp.FromDateTime(DateTime.UtcNow);
-                    if (data.ContainsKey("createdAt") && data["createdAt"] is Timestamp ts)
-                        createdAt = ts;
-
+                    // Trích xuất dữ liệu thủ công để đảm bảo không lỗi
                     var group = new GroupData
                     {
                         GroupId = snapshot.Id,
-                        Name = data.ContainsKey("name") ? data["name"]?.ToString() : "[No Name]",
-                        Avatar = data.ContainsKey("avatar") ? data["avatar"]?.ToString() : "Icons/group.png",
-                        CreatedBy = data.ContainsKey("createdBy") ? data["createdBy"]?.ToString() : "",
-                        CreatedAt = createdAt,
-                        MemberCount = data.ContainsKey("memberCount") ? Convert.ToInt32(data["memberCount"]) : 0,
-                        Members = members.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString()),
-                        PendingMembers = pending.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString())
+                        Name = snapshot.ContainsField("name") ? snapshot.GetValue<string>("name") : "[No Name]",
+                        Avatar = snapshot.ContainsField("avatar") ? snapshot.GetValue<string>("avatar") : "Icons/group.png",
+                        CreatedBy = snapshot.ContainsField("createdBy") ? snapshot.GetValue<string>("createdBy") : "",
+                        CreatedAt = snapshot.ContainsField("createdAt") ? snapshot.GetValue<Timestamp>("createdAt") : Timestamp.FromDateTime(DateTime.UtcNow),
+                        MemberCount = snapshot.ContainsField("memberCount") ? Convert.ToInt32(snapshot.GetValue<long>("memberCount")) : 0,
+                        Members = snapshot.ContainsField("members")
+                            ? snapshot.GetValue<Dictionary<string, object>>("members")
+                                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString())
+                            : new Dictionary<string, string>(),
+                        PendingMembers = snapshot.ContainsField("pendingMembers")
+                            ? snapshot.GetValue<Dictionary<string, object>>("pendingMembers")
+                                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString())
+                            : new Dictionary<string, string>()
                     };
+
+                    Console.WriteLine($"📡 Group {group.GroupId} updated: Name={group.Name}, Avatar={group.Avatar}");
 
                     onGroupChanged?.Invoke(group);
                 });
@@ -1517,6 +1520,9 @@ namespace ChatApp.Services
                 _individualGroupListeners[groupId] = listener;
             }
         }
+
+
+
 
         public async Task StopListeningToEachUserGroupAsync()
         {
@@ -1526,11 +1532,11 @@ namespace ChatApp.Services
         }
 
 
+
         private FirestoreChangeListener _groupChangeListener;
 
         public async Task ListenToUserRelatedGroupsAsync(string userId, Action<List<GroupData>> onGroupsChanged)
         {
-            // Ngừng listener cũ nếu có
             if (_groupChangeListener != null)
             {
                 await _groupChangeListener.StopAsync();
@@ -1539,7 +1545,7 @@ namespace ChatApp.Services
 
             var groupsRef = _firestoreDb.Collection("groups");
 
-            _groupChangeListener = groupsRef.Listen(async snapshot =>
+            _groupChangeListener = groupsRef.Listen(snapshot =>
             {
                 var updatedGroups = new List<GroupData>();
 
@@ -1547,9 +1553,6 @@ namespace ChatApp.Services
                 {
                     if (!doc.Exists) continue;
 
-                    var data = doc.ToDictionary();
-
-                    // Lọc nhóm có liên quan đến userId (member hoặc pending)
                     var members = doc.ContainsField("members")
                         ? doc.GetValue<Dictionary<string, object>>("members")
                         : new Dictionary<string, object>();
@@ -1558,36 +1561,30 @@ namespace ChatApp.Services
                         ? doc.GetValue<Dictionary<string, object>>("pendingMembers")
                         : new Dictionary<string, object>();
 
-                    bool isRelevant = members.ContainsKey(userId) || pending.ContainsKey(userId);
-                    if (!isRelevant) continue;
-
-                    // Parse GroupData
-                    Timestamp createdAt = Timestamp.FromDateTime(DateTime.UtcNow); // fallback mặc định
-
-                    if (data.ContainsKey("createdAt") && data["createdAt"] is Timestamp ts)
-                    {
-                        createdAt = ts;
-                    }
+                    bool isRelated = members.ContainsKey(userId) || pending.ContainsKey(userId);
+                    if (!isRelated) continue;
 
                     var group = new GroupData
                     {
                         GroupId = doc.Id,
-                        Name = data.ContainsKey("name") ? data["name"]?.ToString() : "[No Name]",
-                        Avatar = data.ContainsKey("avatar") ? data["avatar"]?.ToString() : "Icons/group.png",
-                        CreatedBy = data.ContainsKey("createdBy") ? data["createdBy"]?.ToString() : "",
-                        CreatedAt = createdAt,
-                        MemberCount = data.ContainsKey("memberCount") ? Convert.ToInt32(data["memberCount"]) : 0,
+                        Name = doc.ContainsField("name") ? doc.GetValue<string>("name") : "[No Name]",
+                        Avatar = doc.ContainsField("avatar") ? doc.GetValue<string>("avatar") : "Icons/group.png",
+                        CreatedBy = doc.ContainsField("createdBy") ? doc.GetValue<string>("createdBy") : "",
+                        CreatedAt = doc.ContainsField("createdAt") ? doc.GetValue<Timestamp>("createdAt") : Timestamp.FromDateTime(DateTime.UtcNow),
+                        MemberCount = doc.ContainsField("memberCount") ? Convert.ToInt32(doc.GetValue<long>("memberCount")) : 0,
                         Members = members.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString()),
                         PendingMembers = pending.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString())
                     };
 
-
                     updatedGroups.Add(group);
                 }
 
-                onGroupsChanged(updatedGroups);
+                Console.WriteLine($"🔁 Detected {updatedGroups.Count} groups related to user {userId}");
+
+                onGroupsChanged?.Invoke(updatedGroups);
             });
         }
+
 
         public async Task StopListeningToUserRelatedGroupsAsync()
         {
