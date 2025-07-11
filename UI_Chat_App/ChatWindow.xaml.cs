@@ -100,36 +100,19 @@ namespace UI_Chat_App
                     HandleFriendRequestChanged(request);
                 });
             });
-
-            // Lắng nghe thay đổi danh sách bạn bè
-            //await _databaseService.ListenToFriendsAsync(App.CurrentUser.Id, (friend, changeType) =>
-            //{
-            //    Dispatcher.Invoke(() =>
-            //    {
-            //        switch (changeType)
-            //        {
-            //            case Google.Cloud.Firestore.DocumentChange.Type.Added:
-            //            case Google.Cloud.Firestore.DocumentChange.Type.Modified:
-            //                HandleFriendChanged(friend);
-            //                break;
-
-            //            case Google.Cloud.Firestore.DocumentChange.Type.Removed:
-            //                HandleFriendRemoved(friend);
-            //                break;
-            //        }
-            //    });
-            //});
+            // Lắng nghe thay đổi danh sách bạn bè                     
             StartListeningToAllFriends();
-            try
-            {
-                if (!AgoraService.Instance.Initialize())
-                {
-                    System.Windows.MessageBox.Show("Không thể khởi tạo dịch vụ gọi điện. Chức năng gọi sẽ không hoạt động.", "Lỗi Khởi Tạo");
-                }
-                else if (!AgoraService.Instance.HasRequiredDevices())
-                {
-                    System.Windows.MessageBox.Show("Không tìm thấy camera hoặc microphone. Vui lòng kiểm tra lại thiết bị.", "Thiếu Thiết Bị");
-                }
+        }
+            //try
+            //{
+            //    if (!AgoraService.Instance.Initialize())
+            //    {
+            //        System.Windows.MessageBox.Show("Không thể khởi tạo dịch vụ gọi điện. Chức năng gọi sẽ không hoạt động.", "Lỗi Khởi Tạo");
+            //    }
+            //    else if (!AgoraService.Instance.HasRequiredDevices())
+            //    {
+            //        System.Windows.MessageBox.Show("Không tìm thấy camera hoặc microphone. Vui lòng kiểm tra lại thiết bị.", "Thiếu Thiết Bị");
+            //    }
                 
 
             //    _databaseService.ListenForIncomingCall(App.CurrentUser.Id, (incomingCall) =>
@@ -164,8 +147,7 @@ namespace UI_Chat_App
             //catch (Exception ex)
             //{
             //    MessageBox.Show($"Lỗi khởi tạo tính năng gọi điện: {ex.Message}");
-            //}
-        }
+            //}        
 
         private async Task InitializeChatAsync()
         {
