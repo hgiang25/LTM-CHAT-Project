@@ -915,6 +915,23 @@ namespace ChatApp.Services
             }
         }
 
+
+        public class TypingListenerWrapper
+        {
+            public FirestoreChangeListener Listener { get; set; }
+            public bool IsStopped { get; private set; }
+
+            public async Task StopAsync()
+            {
+                if (!IsStopped && Listener != null)
+                {
+                    await Listener.StopAsync();
+                    IsStopped = true;
+                }
+            }
+        }
+
+
         public async Task SetTypingStatusAsync(string senderId, string receiverId, bool isTyping)
         {
             try
