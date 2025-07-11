@@ -1765,5 +1765,46 @@ namespace ChatApp.Services
                 throw;
             }
         }
+
+        // Tìm kiếm tin nhắn 
+        public async Task<List<MessageData>> SearchMessagesSimpleAsync(string chatRoomId, string query, string currentUserId)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(chatRoomId))
+                {
+                    return new List<MessageData>();
+                }
+
+                CollectionReference messagesRef = _firestoreDb
+                    .Collection("messages")
+                    .Document(chatRoomId)
+                    .Collection("messages");
+
+                QuerySnapshot snapshot = await messagesRef.GetSnapshotAsync();
+                var messages = snapshot.Documents
+                    .Select(doc =>
+                    {
+                        var message = doc.ConvertTo<MessageData>();
+                        message.MessageId = doc.Id;
+                        return message;
+                    })
+                    .Where(m => m.SenderId == currentUserId || m.ReceiverId == currentUserId || m.SenderId == "system")
+                    .ToList();
+
+                // Lọc theo từ khóa và giới hạn số lượng
+                return messages
+                    .Where(m => m.Content != null && m.Content.ToLower().Contains(query.ToLower()))
+                    .OrderBy(m => m.Timestamp?.ToDateTime())
+                    .Take(50) // Giới hạn 50 kết quả để giữ đơn giản
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to search messages in chat room {chatRoomId}: {ex.Message}");
+                return new List<MessageData>(); // Trả về danh sách rỗng nếu lỗi
+            }
+        }
+
     }
 }

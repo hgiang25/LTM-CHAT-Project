@@ -583,6 +583,12 @@
     <Resource Include="Icons\group_image.png" />
     <Resource Include="Icons\group_pen.png" />
   </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\sound.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Icons\voice_play.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\Google.Api.CommonProtos.2.16.0\build\Google.Api.CommonProtos.targets" Condition="Exists('..\packages\Google.Api.CommonProtos.2.16.0\build\Google.Api.CommonProtos.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
