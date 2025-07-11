@@ -132,39 +132,39 @@ namespace UI_Chat_App
                 }
                 
 
-                _databaseService.ListenForIncomingCall(App.CurrentUser.Id, (incomingCall) =>
-                {
-                    Dispatcher.Invoke(async () => // ✅ Chuyển sang async
-                    {
-                        if (AgoraService.Instance.IsInCall) return;
+            //    _databaseService.ListenForIncomingCall(App.CurrentUser.Id, (incomingCall) =>
+            //    {
+            //        Dispatcher.Invoke(async () => // ✅ Chuyển sang async
+            //        {
+            //            if (AgoraService.Instance.IsInCall) return;
 
-                        // 💡 KIỂM TRA LẠI TRẠNG THÁI TRƯỚC KHI HỎI
-                        var currentCallState = await _databaseService.GetCallAsync(incomingCall.ChannelName);
-                        if (currentCallState == null || currentCallState.Status != "calling")
-                        {
-                            // Cuộc gọi đã bị hủy hoặc kết thúc -> không làm gì cả
-                            return;
-                        }
+            //            // 💡 KIỂM TRA LẠI TRẠNG THÁI TRƯỚC KHI HỎI
+            //            var currentCallState = await _databaseService.GetCallAsync(incomingCall.ChannelName);
+            //            if (currentCallState == null || currentCallState.Status != "calling")
+            //            {
+            //                // Cuộc gọi đã bị hủy hoặc kết thúc -> không làm gì cả
+            //                return;
+            //            }
 
-                        var result = System.Windows.MessageBox.Show($"{incomingCall.CallerName} đang gọi bạn. Trả lời?", "Cuộc gọi đến", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            //            var result = System.Windows.MessageBox.Show($"{incomingCall.CallerName} đang gọi bạn. Trả lời?", "Cuộc gọi đến", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
-                        if (result == MessageBoxResult.Yes)
-                        {
-                            await _databaseService.UpdateCallStatusAsync(incomingCall.ChannelName, "ongoing");
-                            CallWindow callWindow = new CallWindow(incomingCall, false); // false = người nhận
-                            callWindow.Show();
-                        }
-                        else
-                        {
-                            await _databaseService.UpdateCallStatusAsync(incomingCall.ChannelName, "rejected");
-                        }
-                    });
-                });
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Lỗi khởi tạo tính năng gọi điện: {ex.Message}");
-            }
+            //            if (result == MessageBoxResult.Yes)
+            //            {
+            //                await _databaseService.UpdateCallStatusAsync(incomingCall.ChannelName, "ongoing");
+            //                CallWindow callWindow = new CallWindow(incomingCall, false); // false = người nhận
+            //                callWindow.Show();
+            //            }
+            //            else
+            //            {
+            //                await _databaseService.UpdateCallStatusAsync(incomingCall.ChannelName, "rejected");
+            //            }
+            //        });
+            //    });
+            //}
+            //catch (Exception ex)
+            //{
+            //    MessageBox.Show($"Lỗi khởi tạo tính năng gọi điện: {ex.Message}");
+            //}
         }
 
         private async Task InitializeChatAsync()
@@ -1677,7 +1677,7 @@ namespace UI_Chat_App
                 MessageBox.Show($"Failed to update online status: {ex.Message}\nYou may still appear online.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
 
-            await _databaseService.StopListeningForCalls();
+            //await _databaseService.StopListeningForCalls();
             //AgoraService.Instance.Dispose();
         }
 
@@ -2972,7 +2972,7 @@ namespace UI_Chat_App
                     var message = new MessageData
                     {
                         SenderId = App.CurrentUser.Id,
-                        ReceiverId = _selectedUser.Id,
+                        ReceiverId = _selectedUser?.Id,
                         Content = emojiKey,
                         Timestamp = timestamp,
                         MessageType = "Emoji"
@@ -3904,52 +3904,52 @@ namespace UI_Chat_App
                 UserListBox.ItemsSource = _chatrooms;
         }
 
-        private async void StartCallButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (_selectedUser == null)
-            {
-                MessageBox.Show("Vui lòng chọn một người bạn để bắt đầu cuộc gọi.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
+        //private async void StartCallButton_Click(object sender, RoutedEventArgs e)
+        //{
+        //    if (_selectedUser == null)
+        //    {
+        //        MessageBox.Show("Vui lòng chọn một người bạn để bắt đầu cuộc gọi.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+        //        return;
+        //    }
 
-            if (AgoraService.Instance.IsInCall)
-            {
-                MessageBox.Show("Bạn đang trong một cuộc gọi khác.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
+        //    if (AgoraService.Instance.IsInCall)
+        //    {
+        //        MessageBox.Show("Bạn đang trong một cuộc gọi khác.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+        //        return;
+        //    }
 
-            // ✅ Thêm kiểm tra thiết bị
-            if (!AgoraService.Instance.HasRequiredDevices())
-            {
-                MessageBox.Show("Không tìm thấy camera hoặc microphone. Vui lòng kiểm tra lại thiết bị của bạn.", "Lỗi Thiết Bị", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
+        //    // ✅ Thêm kiểm tra thiết bị
+        //    if (!AgoraService.Instance.HasRequiredDevices())
+        //    {
+        //        MessageBox.Show("Không tìm thấy camera hoặc microphone. Vui lòng kiểm tra lại thiết bị của bạn.", "Lỗi Thiết Bị", MessageBoxButton.OK, MessageBoxImage.Error);
+        //        return;
+        //    }
 
-            // ✅ Bọc toàn bộ logic trong try-catch để xử lý lỗi
-            try
-            {
-                var callData = new CallData
-                {
-                    ChannelName = Guid.NewGuid().ToString(),
-                    CallerId = App.CurrentUser.Id,
-                    CallerName = App.CurrentUser.DisplayName,
-                    ReceiverId = _selectedUser.Id,
-                    Status = "calling" // Trạng thái ban đầu
-                };
+        //    // ✅ Bọc toàn bộ logic trong try-catch để xử lý lỗi
+        //    try
+        //    {
+        //        var callData = new CallData
+        //        {
+        //            ChannelName = Guid.NewGuid().ToString(),
+        //            CallerId = App.CurrentUser.Id,
+        //            CallerName = App.CurrentUser.DisplayName,
+        //            ReceiverId = _selectedUser.Id,
+        //            Status = "calling" // Trạng thái ban đầu
+        //        };
 
-                // ✅ Chờ cho việc lưu vào Firebase hoàn tất
-                await _databaseService.InitiateCallAsync(callData);
+        //        // ✅ Chờ cho việc lưu vào Firebase hoàn tất
+        //        await _databaseService.InitiateCallAsync(callData);
 
-                // Mở cửa sổ cuộc gọi
-                CallWindow callWindow = new CallWindow(callData, true); // true = người gọi
-                callWindow.Show();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Lỗi khi bắt đầu cuộc gọi: {ex.Message}");
-                MessageBox.Show($"Không thể bắt đầu cuộc gọi. Vui lòng kiểm tra kết nối mạng và thử lại.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
+        //        // Mở cửa sổ cuộc gọi
+        //        CallWindow callWindow = new CallWindow(callData, true); // true = người gọi
+        //        callWindow.Show();
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Console.WriteLine($"Lỗi khi bắt đầu cuộc gọi: {ex.Message}");
+        //        MessageBox.Show($"Không thể bắt đầu cuộc gọi. Vui lòng kiểm tra kết nối mạng và thử lại.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+        //    }
+        //}
 
         private void EditGroupNameButton_Click(object sender, RoutedEventArgs e)
         {
