@@ -371,6 +371,7 @@
     <Compile Include="Models\MessageData.cs" />
     <Compile Include="Models\NotificationData.cs" />
     <Compile Include="Models\PendingMemberModel.cs" />
+    <Compile Include="Models\TypingListenerWrapper.cs" />
     <Compile Include="Models\UserData.cs" />
     <Compile Include="Services\AgoraService.cs" />
     <Compile Include="Services\FirebaseAuthService.cs" />

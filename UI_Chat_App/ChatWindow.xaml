@@ -528,7 +528,7 @@
             </Grid>
 
             <!-- Cột danh sách người dùng -->
-            <Border Grid.Row="1" Grid.Column="0" Background="	#dcdcdc" CornerRadius="20,20,20,20" Margin="5">
+            <Border Grid.Row="1" Grid.Column="0" Background="#b0e0e6" CornerRadius="20,20,20,20" Margin="5">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -1213,9 +1213,7 @@
                             <Button x:Name="SearchChatButton" Width="30" Height="30" Background="Transparent" BorderBrush="Transparent" Click="SearchButtonChat_Click" Style="{StaticResource WindowButtonStyle}">
                                 <Image Source="Icons/search.png" Width="20" Height="20"/>
                             </Button>
-                            <Button x:Name="StartCallButton" Width="40" Height="40" Background="Transparent" BorderBrush="Transparent" Margin="0,0,5,0" Click="StartCallButton_Click" Style="{StaticResource WindowButtonStyle}">
-                                <Image Source="Icons/voicecall.png" Width="20" Height="20"/>
-                            </Button>
+                            
                             <Button Width="40" Height="40" Background="Transparent" BorderBrush="Transparent" Margin="0,0,5,0" Click="Optional_Click" Style="{StaticResource WindowButtonStyle}">
                                 <Image Source="Icons/optional.png" Width="20" Height="20"/>
                             </Button>

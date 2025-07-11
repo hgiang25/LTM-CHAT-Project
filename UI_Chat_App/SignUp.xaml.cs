@@ -54,7 +54,7 @@ namespace UI_Chat_App
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            this.Close();
+            App.Current.Shutdown();
         }
 
         private void TextBox_GotFocus(object sender, RoutedEventArgs e)
@@ -220,5 +220,6 @@ namespace UI_Chat_App
             }
         }
 
+        
     }
 }
