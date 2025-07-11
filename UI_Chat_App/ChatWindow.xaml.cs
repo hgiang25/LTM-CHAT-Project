@@ -708,21 +708,48 @@ namespace UI_Chat_App
                 {
                     await Dispatcher.InvokeAsync(async () =>
                     {
-                        if (!_messages.Any(m => m.MessageId == message.MessageId))
+                        var existing = _messages.FirstOrDefault(m => m.MessageId == message.MessageId);
+                        if (existing == null)
                         {
-                            await AddMessageToUI(message);
+                            await AddMessageToUI(message, forceRefresh: false);
+                        }
+                        else
+                        {
+                            if (!existing.IsSeen && message.IsSeen)
+                            {
+                                existing.IsSeen = true;
+                                await AddMessageToUI(message, forceRefresh: true); // ✅ đúng
+                            }
                         }
                     });
                 });
         }
 
 
-        private async Task AddMessageToUI(MessageData message)
+        private async Task AddMessageToUI(MessageData message, bool forceRefresh = false)
         {
             try
             {
-                if (message == null || string.IsNullOrEmpty(message.MessageId) || _messages.Any(m => m.MessageId == message.MessageId))
+                if (message == null || string.IsNullOrEmpty(message.MessageId))
                     return;
+
+                if (!forceRefresh && _messages.Any(m => m.MessageId == message.MessageId))
+                    return;
+                if (forceRefresh)
+                {
+                    // Xoá message cũ trong UI (dựa vào Tag = MessageId)
+                    var existingUI = MessagesStackPanel.Children
+                        .OfType<StackPanel>()
+                        .FirstOrDefault(sp => sp.Tag?.ToString() == message.MessageId);
+                    if (existingUI != null)
+                        MessagesStackPanel.Children.Remove(existingUI);
+
+                    // Xoá khỏi danh sách tin nhắn
+                    var toRemove = _messages.FirstOrDefault(m => m.MessageId == message.MessageId);
+                    if (toRemove != null)
+                        _messages.Remove(toRemove);
+                }
+
 
                 var isMine = message.SenderId == App.CurrentUser.Id;
                 _messages.Add(message);
@@ -983,8 +1010,7 @@ namespace UI_Chat_App
                         Margin = new Thickness(5),
                         Child = systemText,
                         HorizontalAlignment = HorizontalAlignment.Center
-                    };
-
+                    };                    
                     MessagesStackPanel.Children.Add(systemBorder);
                     return;
                 }
@@ -1079,7 +1105,7 @@ namespace UI_Chat_App
                     Orientation = Orientation.Horizontal,
                     HorizontalAlignment = isMine ? HorizontalAlignment.Right : HorizontalAlignment.Left
                 };
-
+                messageRow.Tag = message.MessageId;
                 if (!isMine)
                 {
                     messageRow.Children.Add(avatarImage);
@@ -1152,7 +1178,7 @@ namespace UI_Chat_App
                 {
                     if (!_messages.Any(m => m.MessageId == message.MessageId))
                     {
-                        await AddMessageToUI(message);
+                        await AddMessageToUI(message, forceRefresh: false);
                     }
                 }
                 MessagesStackPanel.UpdateLayout();
@@ -1375,10 +1401,11 @@ namespace UI_Chat_App
                     MessagesStackPanel.Children.Clear();
                     MessageTextBox.Clear();
 
-                    await RefreshNotificationAsync();
                     await _databaseService.StopListeningToMessagesAsync();
                     await LoadInitialMessagesAsync(_currentChatRoomId);
-                    await StartListeningForMessages(_currentChatRoomId);
+                    await StartListeningForMessages(_currentChatRoomId);  // ✅ cần gọi trước
+
+                    await RefreshNotificationAsync();  // ✅ gọi sau cùng
 
                     EditUsernameButton.Visibility = Visibility.Collapsed;
                     EditGroupNameButton.Visibility = Visibility.Collapsed;
@@ -1403,11 +1430,15 @@ namespace UI_Chat_App
                 MessagesStackPanel.Children.Clear();
                 MessageTextBox.Clear();
 
-                await RefreshNotificationAsync();
                 await _databaseService.StopListeningToMessagesAsync();
                 await LoadInitialMessagesAsync(_currentChatRoomId);
-                await StartListeningForMessages(_currentChatRoomId);
+                await StartListeningForMessages(_currentChatRoomId);  // ✅ cần gọi trước
 
+                await RefreshNotificationAsync();  // ✅ gọi sau cùng
+                if(_selectedGroup == null)
+                {
+                    return;
+                }
                 bool isAdmin = _selectedGroup.Members.TryGetValue(App.CurrentUser.Id, out var role)
                                && role.Equals("admin", StringComparison.OrdinalIgnoreCase);
                 EditGroupNameButton.Visibility = isAdmin ? Visibility.Visible : Visibility.Collapsed;
@@ -2755,7 +2786,7 @@ namespace UI_Chat_App
                         MessageType = "Image",
                         FileUrl = imageUrl
                     };                    
-                    await AddMessageToUI(message);
+                    await AddMessageToUI(message, forceRefresh: false);
 
 
                     await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);  
@@ -2824,7 +2855,7 @@ namespace UI_Chat_App
                         FileUrl = fileUrl,
                         FileName = fileName
                     };
-                    AddMessageToUI(message);
+                    AddMessageToUI(message, forceRefresh: false);
                     await _databaseService.SaveMessageAsync(_currentChatRoomId, message, _idToken);
                     AttachOptionsPanel.Visibility = Visibility.Collapsed;
 

@@ -52,7 +52,7 @@ namespace ChatApp.Services
                 }
 
                 DocumentReference docRef = _firestoreDb.Collection("users").Document(user.Id);
-                await docRef.SetAsync(user, SetOptions.Overwrite);
+                await docRef.SetAsync(user, SetOptions.MergeAll);
                 Console.WriteLine($"Successfully saved user {user.Id} to Firestore.");
             }
             catch (Exception ex)
@@ -1100,7 +1100,9 @@ namespace ChatApp.Services
 
                 foreach (var docChange in snapshot.Changes)
                 {
-                    if (docChange.ChangeType == Google.Cloud.Firestore.DocumentChange.Type.Added)
+                    if (docChange.Document.Exists &&
+                        (docChange.ChangeType == Google.Cloud.Firestore.DocumentChange.Type.Added ||
+                         docChange.ChangeType == Google.Cloud.Firestore.DocumentChange.Type.Modified))
                     {
                         var dict = docChange.Document.ToDictionary();
                         var message = new MessageData
@@ -1122,7 +1124,7 @@ namespace ChatApp.Services
                                 message.Timestamp = Timestamp.FromDateTime(dt.ToUniversalTime());
                         }
 
-                        _ = onMessageReceived?.Invoke(message); // không await vì Firestore SDK yêu cầu non-blocking
+                        _ = onMessageReceived?.Invoke(message); // Invoke on update too
                     }
                 }
             });
