@@ -49,13 +49,7 @@ namespace UI_Chat_App
                 ? Visibility.Visible : Visibility.Collapsed;
         }
         // Dùng để di chuyển cửa sổ khi kéo chuột
-        private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ButtonState == MouseButtonState.Pressed)
-            {
-                this.DragMove();
-            }
-        }
+        
 
         private void MinimizeButton_Click(object sender, RoutedEventArgs e)
         {

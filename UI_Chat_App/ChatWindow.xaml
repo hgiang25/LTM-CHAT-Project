@@ -528,7 +528,7 @@
             </Grid>
 
             <!-- Cột danh sách người dùng -->
-            <Border Grid.Row="1" Grid.Column="0" Background="	#dcdcdc" CornerRadius="20,20,20,20" Margin="5">
+            <Border Grid.Row="1" Grid.Column="0" Background="#b0e0e6" CornerRadius="20,20,20,20" Margin="5">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
