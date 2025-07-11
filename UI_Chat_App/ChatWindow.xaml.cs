@@ -50,7 +50,7 @@ namespace UI_Chat_App
         private Timestamp? _lastMessageTimestamp;        // Lưu thời gian tin nhắn cuối cùng
         private DispatcherTimer _typingTimer;
         private bool _isTyping;
-        private FirestoreChangeListener _typingStatusListener;
+        private TypingListenerWrapper _typingStatusListener;
         public ObservableCollection<object> _chatrooms = new ObservableCollection<object>();
 
 
@@ -1427,18 +1427,17 @@ namespace UI_Chat_App
             var selectedUserId = _selectedUser.Id;
             var selectedDisplayName = _selectedUser.DisplayName;
 
-            // Stop listener cũ
+            // Stop listener cũ nếu có
             if (_typingStatusListener != null)
             {
                 await _typingStatusListener.StopAsync();
                 _typingStatusListener = null;
             }
 
-            _typingStatusListener = _databaseService.ListenToTypingStatus(App.CurrentUser.Id, selectedUserId, isTyping =>
+            var listener = _databaseService.ListenToTypingStatus(App.CurrentUser.Id, selectedUserId, isTyping =>
             {
                 Dispatcher.Invoke(() =>
                 {
-                    // Nếu người đang được chọn không còn là người này nữa thì bỏ qua
                     if (_selectedUser == null || _selectedUser.Id != selectedUserId)
                         return;
 
@@ -1446,7 +1445,10 @@ namespace UI_Chat_App
                     TypingStatusTextBlock.Visibility = isTyping ? Visibility.Visible : Visibility.Collapsed;
                 });
             });
+
+            _typingStatusListener = new TypingListenerWrapper { Listener = listener };
         }
+
 
 
 

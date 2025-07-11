@@ -34,7 +34,7 @@ namespace ChatApp.Services
                 {
                     JsonCredentials = File.ReadAllText(pathToServiceAccountKey)
                 };
-                _firestoreDb = FirestoreDb.Create("my-chatapp-6e8f6", builder.Build());
+                _firestoreDb = FirestoreDb.Create("fir-login-4f488", builder.Build());
             }
             catch (Exception ex)
             {
@@ -914,6 +914,23 @@ namespace ChatApp.Services
                 _notifListener = null;
             }
         }
+
+
+        public class TypingListenerWrapper
+        {
+            public FirestoreChangeListener Listener { get; set; }
+            public bool IsStopped { get; private set; }
+
+            public async Task StopAsync()
+            {
+                if (!IsStopped && Listener != null)
+                {
+                    await Listener.StopAsync();
+                    IsStopped = true;
+                }
+            }
+        }
+
 
         public async Task SetTypingStatusAsync(string senderId, string receiverId, bool isTyping)
         {
