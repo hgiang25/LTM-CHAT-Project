@@ -808,8 +808,10 @@ namespace ChatApp.Services
 
         public async Task ListenToEachFriendAsync(List<string> friendIds, Action<UserData> onUserChanged)
         {
-            // Hủy các listener không còn trong friendIds
-            var obsolete = _individualFriendListeners.Keys.Except(friendIds).ToList();
+            // ✅ Tạo bản sao để tránh lỗi sửa trong lúc duyệt
+            var currentKeys = _individualFriendListeners.Keys.ToList();
+            var obsolete = currentKeys.Except(friendIds).ToList();
+
             foreach (var id in obsolete)
             {
                 if (_individualFriendListeners.TryGetValue(id, out var listener))
@@ -846,6 +848,7 @@ namespace ChatApp.Services
                 _individualFriendListeners[id] = listener;
             }
         }
+
 
         public async Task StopListeningToEachFriendAsync()
         {
@@ -1146,9 +1149,10 @@ namespace ChatApp.Services
 
 
 
-        public async Task<string> CreateGroupAsync(string groupName, string creatorId, List<string> memberIds)
+        public async Task<(string GroupId, List<string> SkippedUserIds)> CreateGroupAsync(string groupName, string creatorId, List<string> memberIds)
         {
             var groupId = Guid.NewGuid().ToString();
+            var skippedUsers = new List<string>();
 
             var members = new Dictionary<string, string>
             {
@@ -1159,26 +1163,35 @@ namespace ChatApp.Services
             {
                 foreach (var id in memberIds)
                 {
-                    if (id != creatorId)
-                        members[id] = "member";
+                    if (id == creatorId) continue;
+
+                    bool isBlocked = await IsBlockedBetweenUsers(creatorId, id);
+                    if (isBlocked)
+                    {
+                        skippedUsers.Add(id);
+                        continue;
+                    }
+
+                    members[id] = "member";
                 }
             }
 
             var groupData = new Dictionary<string, object>
-                {
-                    { "name", groupName },
-                    { "createdBy", creatorId },
-                    { "createdAt", Timestamp.GetCurrentTimestamp() },
-                    { "avatar", "Icons/group.png" },
-                    { "members", members },
-                    { "memberCount", members.Count }
-                };
+    {
+        { "name", groupName },
+        { "createdBy", creatorId },
+        { "createdAt", Timestamp.GetCurrentTimestamp() },
+        { "avatar", "Icons/group.png" },
+        { "members", members },
+        { "memberCount", members.Count }
+    };
 
             var groupRef = _firestoreDb.Collection("groups").Document(groupId);
             await groupRef.SetAsync(groupData);
 
-            return groupId;
+            return (groupId, skippedUsers);
         }
+
 
         public async Task DeleteGroupAsync(string groupId)
         {
@@ -1336,6 +1349,11 @@ namespace ChatApp.Services
             if (members.ContainsKey(targetUserId))
                 throw new Exception("User is already a member.");
 
+            // ✅ Kiểm tra block giữa người mời và người được mời
+            bool isBlocked = await IsBlockedBetweenUsers(inviterId, targetUserId);
+            if (isBlocked)
+                throw new Exception("Không thể mời người dùng này vì có hành vi chặn giữa hai bên.");
+
             // Kiểm tra người mời có phải admin không
             bool isInviterAdmin = members.TryGetValue(inviterId, out var role) && role == "admin";
 
@@ -1355,18 +1373,17 @@ namespace ChatApp.Services
 
                 // Cập nhật cả members và pendingMembers
                 var updates = new Dictionary<string, object>
-                {
-                    { "members", members },
-                    { "pendingMembers", pendingMembers },
-                    { "memberCount", members.Count }
-                };
+        {
+            { "members", members },
+            { "pendingMembers", pendingMembers },
+            { "memberCount", members.Count }
+        };
 
                 await groupRef.UpdateAsync(updates);
                 await SendSystemMessageToChatAsync(groupId, $"👥 {Inviter.DisplayName} đã thêm {TargetUser.DisplayName} vào nhóm.");
             }
             else
             {
-                // Nếu người thường mời => check đã được mời chưa
                 if (pendingMembers.ContainsKey(targetUserId))
                     throw new Exception("User has already been invited.");
 
@@ -1376,6 +1393,7 @@ namespace ChatApp.Services
                 await SendSystemMessageToChatAsync(groupId, $"👥 {Inviter.DisplayName} đã mời {TargetUser.DisplayName} tham gia nhóm.");
             }
         }
+
 
 
         public async Task<List<UserData>> GetUsersByIdsAsync(List<string> userIds)
@@ -1406,7 +1424,7 @@ namespace ChatApp.Services
             // Xóa trực tiếp userId khỏi trường pendingMembers mà không cần tải toàn bộ
             var updates = new Dictionary<string, object>
     {
-        { $"pending members.{userId}", FieldValue.Delete }
+        { $"pendingMembers.{userId}", FieldValue.Delete }
     };
 
             await groupRef.UpdateAsync(updates);
@@ -1480,11 +1498,11 @@ namespace ChatApp.Services
             {
                 var pendingMap = snapshot.GetValue<Dictionary<string, object>>("pendingMembers");
                 groupData.PendingMembers = pendingMap.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString());
-                Console.WriteLine($"[DEBUG] Loaded pending members: {string.Join(", ", groupData.PendingMembers.Select(kvp => $"{kvp.Key}: {kvp.Value}"))}");
+                Console.WriteLine($"[DEBUG] Loaded pendingMembers: {string.Join(", ", groupData.PendingMembers.Select(kvp => $"{kvp.Key}: {kvp.Value}"))}");
             }
             else
             {
-                Console.WriteLine("[DEBUG] No pending members found in group document.");
+                Console.WriteLine("[DEBUG] No pendingMembers found in group document.");
             }
 
             return groupData;
@@ -1690,6 +1708,85 @@ namespace ChatApp.Services
             }
         }
 
+
+        private FirestoreChangeListener _newGroupMembershipListener;
+
+        private Dictionary<string, bool> _membershipStatus = new Dictionary<string, bool>();
+
+        public async Task ListenToNewGroupMembershipAsync(string userId, Action<GroupData> onNewGroupDetected)
+        {
+            if (_newGroupMembershipListener != null)
+            {
+                await _newGroupMembershipListener.StopAsync();
+                _newGroupMembershipListener = null;
+            }
+
+            var groupsRef = _firestoreDb.Collection("groups");
+
+            _newGroupMembershipListener = groupsRef.Listen(snapshot =>
+            {
+                foreach (var change in snapshot.Changes)
+                {
+                    if (change.ChangeType != Google.Cloud.Firestore.DocumentChange.Type.Added &&
+                        change.ChangeType != Google.Cloud.Firestore.DocumentChange.Type.Modified)
+                        continue;
+
+                    var doc = change.Document;
+                    if (!doc.Exists) continue;
+
+                    var groupId = doc.Id;
+
+                    var members = doc.ContainsField("members")
+                        ? doc.GetValue<Dictionary<string, object>>("members")
+                        : new Dictionary<string, object>();
+
+                    bool isNowMember = members.ContainsKey(userId);
+
+                    // Lấy trạng thái cũ nếu có
+                    bool wasMember = _membershipStatus.TryGetValue(groupId, out var previous) && previous;
+
+                    // Nếu trước đó chưa phải member, giờ thì là => mới được thêm
+                    if (!wasMember && isNowMember)
+                    {
+                        _membershipStatus[groupId] = true;
+
+                        var group = new GroupData
+                        {
+                            GroupId = groupId,
+                            Name = doc.ContainsField("name") ? doc.GetValue<string>("name") : "[No Name]",
+                            Avatar = doc.ContainsField("avatar") ? doc.GetValue<string>("avatar") : "Icons/group.png",
+                            CreatedBy = doc.ContainsField("createdBy") ? doc.GetValue<string>("createdBy") : "",
+                            CreatedAt = doc.ContainsField("createdAt") ? doc.GetValue<Timestamp>("createdAt") : Timestamp.FromDateTime(DateTime.UtcNow),
+                            MemberCount = doc.ContainsField("memberCount") ? Convert.ToInt32(doc.GetValue<long>("memberCount")) : 0,
+                            Members = members.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString()),
+                            PendingMembers = doc.ContainsField("pendingMembers")
+                                ? doc.GetValue<Dictionary<string, object>>("pendingMembers")
+                                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString())
+                                : new Dictionary<string, string>()
+                        };
+
+                        Console.WriteLine($"📥 User {userId} just added to group {group.GroupId}");
+
+                        onNewGroupDetected?.Invoke(group);
+                    }
+                    else
+                    {
+                        // Cập nhật lại trạng thái nếu bị kick ra
+                        _membershipStatus[groupId] = isNowMember;
+                    }
+                }
+            });
+        }
+
+
+        public async Task StopListeningToNewGroupMembershipAsync()
+        {
+            if (_newGroupMembershipListener != null)
+            {
+                await _newGroupMembershipListener.StopAsync();
+                _newGroupMembershipListener = null;
+            }
+        }
 
 
 

@@ -148,8 +148,24 @@ namespace UI_Chat_App
                 });
             });
 
+            await _databaseService.ListenToNewGroupMembershipAsync(App.CurrentUser.Id, async group =>
+            {
+                await Dispatcher.InvokeAsync(async () =>
+                {
+                    if (_groups.Any(g => g.GroupId == group.GroupId)) return;
+
+                    group.AvatarBitmap = !string.IsNullOrEmpty(group.Avatar)
+                        ? await DownloadImageSafelyAsync(group.Avatar)
+                        : null;
+
+                    _groups.Add(group);
+                    UpdateChatroomList();
+                    Console.WriteLine($"[UI] Auto added new group: {group.Name}");
+                });
+            });
+
         }
-        
+
         private async Task InitializeChatAsync()
         {
             try
@@ -1316,7 +1332,7 @@ namespace UI_Chat_App
             _selectedGroup = null;
             UserListBox.SelectedItem = null;
             MessagesStackPanel.Children.Clear();
-            ChatWithTextBlock.Text = "Chat";
+            ChatWithTextBlock.Text = "Chat with: [User/Group]";
         }
 
         private async Task LoadAllUsersAsync()
@@ -1361,6 +1377,7 @@ namespace UI_Chat_App
 
             var selectedItem = UserListBox.SelectedItem;
 
+            // 🛑 Trước khi chuyển người hoặc nhóm, tắt typing và timer cũ
             if (_selectedUser != null)
             {
                 await SetTypingStatusAsync(false);
@@ -1368,6 +1385,7 @@ namespace UI_Chat_App
                 _isTyping = false;
             }
 
+            // 🛑 Hủy lắng nghe typing cũ nếu có
             if (_typingStatusListener != null)
             {
                 await _typingStatusListener.StopAsync();
@@ -1380,37 +1398,52 @@ namespace UI_Chat_App
 
                 if ((newSelectedUser != _selectedUser && newSelectedUser != null) || _currentChatRoomId == null)
                 {
+                    // 👉 Gán trước, rồi kiểm tra null
                     _selectedUser = newSelectedUser;
                     _selectedGroup = null;
-                    _isUserProfileVisible = true;
-                    _isShowingMyProfile = false;
 
-                    bool areFriends = await _databaseService.AreFriendsAsync(App.CurrentUser.Id, _selectedUser.Id);
-                    if (!areFriends)
+                    if (_selectedUser == null)
                     {
-                        MessageBox.Show("You can only chat with friends.");
                         ResetChatUI();
                         return;
                     }
 
-                    ShowUserProfile(_selectedUser); // ✅ gọi hàm có animation
+                    bool areFriends = await _databaseService.AreFriendsAsync(App.CurrentUser.Id, _selectedUser.Id);
+                    if (!areFriends)
+                    {
+                        MessageBox.Show("You can only chat with friends. Please add this user as a friend first.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+                        ResetChatUI();
+                        return;
+                    }
+
+                    GroupProfilePanel.Visibility = Visibility.Collapsed;
+                    UserProfilePanel.Visibility = Visibility.Visible;
+                    UserProfileColumn.Width = new GridLength(230);
+
+                    // 👉 Dùng _selectedUser đã được kiểm tra null
+                    ChatWithTextBlock.Text = $"Chat with {_selectedUser.DisplayName ?? "[Unknown]"}";
+                    ProfileUsername.Text = $"Username: {_selectedUser.DisplayName ?? "[Unknown]"}";
+                    ProfileEmail.Text = $"Email: {_selectedUser.Email ?? "[No Email]"}";
+                    ProfileStatus.Text = $"Status: {(_selectedUser.IsOnline ? "Online" : "Offline")}";
+                    ProfileAvatar.Source = LoadAvatar(_selectedUser.Avatar ?? "");
 
                     _currentChatRoomId = _databaseService.GenerateChatRoomId(App.CurrentUser.Id, _selectedUser.Id);
                     _lastMessageTimestamp = null;
                     _messages.Clear();
                     MessagesStackPanel.Children.Clear();
-                    MessageTextBox.Clear();
 
+                    await RefreshNotificationAsync();
                     await _databaseService.StopListeningToMessagesAsync();
                     await LoadInitialMessagesAsync(_currentChatRoomId);
-                    await StartListeningForMessages(_currentChatRoomId);  // ✅ cần gọi trước
-
-                    await RefreshNotificationAsync();  // ✅ gọi sau cùng
+                    await StartListeningForMessages(_currentChatRoomId);
 
                     EditUsernameButton.Visibility = Visibility.Collapsed;
                     EditGroupNameButton.Visibility = Visibility.Collapsed;
 
                     StartListeningToTyping();
+
+                    _isUserProfileVisible = true;
+                    _isShowingMyProfile = false;
                 }
             }
             else if (selectedItem is GroupData selectedGroup)
@@ -1419,34 +1452,59 @@ namespace UI_Chat_App
 
                 _selectedGroup = await _databaseService.GetGroupAsync(selectedGroup.GroupId);
                 _selectedUser = null;
-                _isUserProfileVisible = true;
-                _isShowingMyProfile = false;
 
-                await ShowGroupProfileAsync(); // ✅ gọi hàm có animation
+                // 🔁 Reset UI nhóm cũ
+                GroupMembersList.ItemsSource = null;
+                GroupMembersList.Visibility = Visibility.Collapsed;
+                PendingMembersListBox.ItemsSource = null;
+                PendingMembersListBox.Visibility = Visibility.Collapsed;
+                PendingMembersLabel.Visibility = Visibility.Collapsed;
+                ApproveSelectedButton.Visibility = Visibility.Collapsed;
+                RejectSelectedButton.Visibility = Visibility.Collapsed;
+                FriendCheckboxList.ItemsSource = null;
+                FriendCheckboxList.Visibility = Visibility.Collapsed;
+                ConfirmInviteButton.Visibility = Visibility.Collapsed;
+                InviteFriendLabel.Visibility = Visibility.Collapsed;
+
+                var adminName = await GetUserNameById(_selectedGroup.CreatedBy);
+
+                bool isAdmin = _selectedGroup.Members.TryGetValue(App.CurrentUser.Id, out var role)
+                               && role.Equals("admin", StringComparison.OrdinalIgnoreCase);
+                DeleteGroupButton.Visibility = isAdmin ? Visibility.Visible : Visibility.Collapsed;
+
+                UserProfilePanel.Visibility = Visibility.Collapsed;
+                GroupProfilePanel.Visibility = Visibility.Visible;
+                UserProfileColumn.Width = new GridLength(230);
+
+                ChatWithTextBlock.Text = $"Group: {_selectedGroup.Name}";
+                GroupProfileName.Text = _selectedGroup.Name;
+                GroupCreatedBy.Text = $"Admin: {adminName}";
+                GroupMemberCount.Text = $"Members: {_selectedGroup.MemberCount} members";
+                GroupProfileAvatar.Source = LoadAvatar(_selectedGroup.Avatar);
 
                 _currentChatRoomId = _selectedGroup.GroupId;
                 _lastMessageTimestamp = null;
                 _messages.Clear();
                 MessagesStackPanel.Children.Clear();
-                MessageTextBox.Clear();
 
+                await RefreshNotificationAsync();
                 await _databaseService.StopListeningToMessagesAsync();
                 await LoadInitialMessagesAsync(_currentChatRoomId);
-                await StartListeningForMessages(_currentChatRoomId);  // ✅ cần gọi trước
+                await StartListeningForMessages(_currentChatRoomId);
 
-                await RefreshNotificationAsync();  // ✅ gọi sau cùng
-                if(_selectedGroup == null)
-                {
-                    return;
-                }
-                bool isAdmin = _selectedGroup.Members.TryGetValue(App.CurrentUser.Id, out var role)
-                               && role.Equals("admin", StringComparison.OrdinalIgnoreCase);
+                // Hiển thị nút chỉnh sửa tên nhóm nếu là admin
                 EditGroupNameButton.Visibility = isAdmin ? Visibility.Visible : Visibility.Collapsed;
-                DeleteGroupButton.Visibility = isAdmin ? Visibility.Visible : Visibility.Collapsed;
 
+                // Ẩn nút chỉnh sửa username
                 EditUsernameButton.Visibility = Visibility.Collapsed;
+
+                // ✅ Ẩn typing nếu đang từ user chuyển qua group
                 TypingStatusTextBlock.Text = "";
                 TypingStatusTextBlock.Visibility = Visibility.Collapsed;
+
+                // ✅ Cập nhật trạng thái profile
+                _isUserProfileVisible = true;
+                _isShowingMyProfile = false;
             }
             else
             {
@@ -1456,6 +1514,20 @@ namespace UI_Chat_App
 
 
 
+
+        private void ResetGroupUI()
+        {
+            GroupMembersList.ItemsSource = null;
+            GroupMembersList.Visibility = Visibility.Collapsed;
+
+            PendingMembersListBox.ItemsSource = null;
+            PendingMembersLabel.Visibility = Visibility.Collapsed;
+            PendingMembersListBox.Visibility = Visibility.Collapsed;
+            ApproveSelectedButton.Visibility = Visibility.Collapsed;
+            RejectSelectedButton.Visibility = Visibility.Collapsed;
+
+            FriendCheckboxList.ItemsSource = null;
+        }
 
         private void ResetChatUI()
         {
@@ -1468,26 +1540,8 @@ namespace UI_Chat_App
             MessagesStackPanel.Children.Clear();
             ChatWithTextBlock.Text = "Chat with [User/Group]";
 
-            ProfileAvatar.Source = null;
-            ProfileUsername.Text = "Username: [Username]";
-            ProfileEmail.Text = "Email: user@example.com";
-            ProfileStatus.Text = "Status: Offline";
-
-            // Ẩn cả hai profile panel
-            UserProfilePanel.Visibility = Visibility.Collapsed;
-            GroupProfilePanel.Visibility = Visibility.Collapsed;
+            ShowMyProfile();                                    
             EmptyPromptTextBlock.Visibility = Visibility.Visible;
-
-            //// 👉 Reset UI liên quan đến nhóm
-            //GroupMembersList.ItemsSource = null;
-            //GroupMembersList.Visibility = Visibility.Collapsed;
-            //PendingMembersListBox.ItemsSource = null;
-            //PendingMembersPopup.IsOpen = false;
-
-            //// Nếu bạn có thể disable các nút (tùy thiết kế)
-            //ViewMembersButton.IsEnabled = false;
-            //InviteMemberButton.IsEnabled = false;
-            //LeaveGroupButton.IsEnabled = false;
         }
 
 
@@ -1672,6 +1726,7 @@ namespace UI_Chat_App
                 }
                 await _databaseService.StopListeningForNotificationsAsync();
                 await _databaseService.StopListeningToUserRelatedGroupsAsync();
+                await _databaseService.StopListeningToNewGroupMembershipAsync();
                 if (_typingStatusListener != null)
                 {
                     await _typingStatusListener.StopAsync();
@@ -1750,6 +1805,7 @@ namespace UI_Chat_App
                 }
                 await _databaseService.StopListeningForNotificationsAsync();
                 await _databaseService.StopListeningToUserRelatedGroupsAsync();
+                await _databaseService.StopListeningToNewGroupMembershipAsync();
                 if (_typingStatusListener != null)
                 {
                     await _typingStatusListener.StopAsync();
@@ -2079,21 +2135,24 @@ namespace UI_Chat_App
             CreateGroupButton.IsEnabled = false;
             try
             {
-                // (Tuỳ chọn) Kiểm tra nhóm trùng tên
-                // var existingGroups = await _firestoreDb.Collection("groups")
-                //     .WhereEqualTo("name", groupName).GetSnapshotAsync();
-                // if (existingGroups.Count > 0)
-                // {
-                //     MessageBox.Show("Tên nhóm đã tồn tại, vui lòng chọn tên khác.");
-                //     return;
-                // }
+                var (groupId, skippedUserIds) = await _databaseService.CreateGroupAsync(groupName, App.CurrentUser.Id, memberIds);
 
-                var groupId = await _databaseService.CreateGroupAsync(groupName, App.CurrentUser.Id, memberIds);
                 MessageBox.Show($"Tạo nhóm thành công!\nID nhóm: {groupId}");
-                await RefreshFriendsAndRequestsAsync();
-                // (Tuỳ chọn mở chat nhóm hoặc cập nhật danh sách nhóm UI)
 
-                //this.Close();
+                if (skippedUserIds.Any())
+                {
+                    var skippedNames = _users
+                        .Where(u => skippedUserIds.Contains(u.Id))
+                        .Select(u => u.DisplayName)
+                        .ToList();
+
+                    string skippedMsg = "⚠️ Không thể thêm các thành viên sau do bị chặn:\n- " + string.Join("\n- ", skippedNames);
+                    MessageBox.Show(skippedMsg, "Thành viên bị bỏ qua", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+
+                await RefreshFriendsAndRequestsAsync();
+                GroupNameTextBox.Text = "";
+                GroupUserListBox.UnselectAll();
             }
             catch (Exception ex)
             {
@@ -2104,6 +2163,7 @@ namespace UI_Chat_App
                 CreateGroupButton.IsEnabled = true;
             }
         }
+
 
 
 
@@ -2292,7 +2352,7 @@ namespace UI_Chat_App
             _isUserProfileVisible = false;
             _isShowingMyProfile = false;
         }
-
+       
 
 
 
@@ -3196,6 +3256,8 @@ namespace UI_Chat_App
                 else if (TabControl.SelectedIndex == 2)
                 {
                     GroupUserListBox.ItemsSource = _users;
+                    GroupNameTextBox.Text = string.Empty;
+                    GroupUserListBox.UnselectAll();
                 }
 
                 // Đảm bảo giao diện cập nhật
@@ -3452,7 +3514,7 @@ namespace UI_Chat_App
             }
 
             // ✅ Tên nhóm
-            ChatWithTextBlock.Text = _selectedGroup.Name ?? "[No Name]";
+            ChatWithTextBlock.Text ="Group: " + _selectedGroup.Name ?? "[No Name]";
             GroupProfileName.Text = _selectedGroup.Name ?? "[No Name]"; // <- Cần bổ sung dòng này
 
             // ✅ Admin
@@ -3812,13 +3874,12 @@ namespace UI_Chat_App
                     try
                     {
                         await _databaseService.ChangeGroupAdminAsync(groupId, currentUserId, selectedAdminId);
-                        await _databaseService.RemoveMemberFromGroupAsync(groupId, currentUserId);
-
                         var newAdminName = users.FirstOrDefault(u => u.Id == selectedAdminId)?.DisplayName ?? "[Người được chọn]";
                         await _databaseService.SendSystemMessageToChatAsync(
                             groupId,
                             $"{App.CurrentUser.DisplayName} đã rời nhóm và chuyển quyền admin cho {newAdminName}."
                         );
+                        await _databaseService.RemoveMemberFromGroupAsync(groupId, currentUserId);                        
 
                         MessageBox.Show("Bạn đã rời nhóm và chuyển quyền admin thành công.");
                         _selectedGroup = null;
@@ -3839,12 +3900,12 @@ namespace UI_Chat_App
 
                 try
                 {
-                    await _databaseService.RemoveMemberFromGroupAsync(groupId, currentUserId);
+                    
                     await _databaseService.SendSystemMessageToChatAsync(
                         groupId,
                         $"{App.CurrentUser.DisplayName} đã rời nhóm."
                     );
-
+                    await _databaseService.RemoveMemberFromGroupAsync(groupId, currentUserId);
                     MessageBox.Show("Bạn đã rời nhóm.");
                     _selectedGroup = null;
 
@@ -3885,15 +3946,13 @@ namespace UI_Chat_App
 
                 _selectedGroup = null;
                 ResetChatUI();
-                await RefreshGroupUIAsync();
+                //await RefreshGroupUIAsync();
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Lỗi khi xóa nhóm: " + ex.Message);
             }
         }        
-
-
 
 
 
