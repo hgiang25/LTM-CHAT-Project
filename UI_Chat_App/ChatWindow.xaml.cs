@@ -316,10 +316,11 @@ namespace UI_Chat_App
                 }
             }
 
-            Dispatcher.Invoke(() =>
+            Dispatcher.Invoke(async() =>
             {
                 if (UserListBox.ItemsSource != _chatrooms)
                     UserListBox.ItemsSource = _chatrooms;
+                await RefreshFriendsAndRequestsAsync();
             });
         }
 

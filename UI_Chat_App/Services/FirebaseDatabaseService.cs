@@ -64,21 +64,25 @@ namespace ChatApp.Services
 
         public async Task<Dictionary<string, UserData>> GetAllUsersAsync(string idToken)
         {
-            try
+            var snapshot = await _firestoreDb.Collection("users").GetSnapshotAsync();
+            var result = new Dictionary<string, UserData>();
+
+            foreach (var doc in snapshot.Documents)
             {
-                CollectionReference usersRef = _firestoreDb.Collection("users");
-                QuerySnapshot snapshot = await usersRef.GetSnapshotAsync();
-                var usersDict = snapshot.Documents.ToDictionary(
-                    doc => doc.Id,
-                    doc => doc.ConvertTo<UserData>());
-                Console.WriteLine($"Loaded {usersDict.Count} users from Firestore.");
-                return usersDict;
+                var dict = doc.ToDictionary();
+                result[doc.Id] = new UserData
+                {
+                    Id = doc.Id,
+                    DisplayName = dict.TryGetValue("DisplayName", out var d) ? d as string : null,
+                    Avatar = dict.TryGetValue("Avatar", out var a) ? a as string : null,
+                    IsOnline = dict.TryGetValue("IsOnline", out var o) && o is bool online && online,
+                    Email = dict.TryGetValue("Email", out var e) ? e as string : null
+                };
             }
-            catch (Exception ex)
-            {
-                throw new Exception("Failed to get all users from Firestore: " + ex.Message, ex);
-            }
+
+            return result;
         }
+
 
         public async Task SaveMessageAsync(string chatRoomId, MessageData message, string idToken)
         {
