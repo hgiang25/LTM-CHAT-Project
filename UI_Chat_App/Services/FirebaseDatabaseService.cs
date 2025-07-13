@@ -34,7 +34,7 @@ namespace ChatApp.Services
                 {
                     JsonCredentials = File.ReadAllText(pathToServiceAccountKey)
                 };
-                _firestoreDb = FirestoreDb.Create("fir-login-4f488", builder.Build());
+                _firestoreDb = FirestoreDb.Create("my-chatapp-6e8f6", builder.Build());
             }
             catch (Exception ex)
             {
@@ -812,6 +812,9 @@ namespace ChatApp.Services
 
         public async Task ListenToEachFriendAsync(List<string> friendIds, Action<UserData> onUserChanged)
         {
+            if (_individualFriendListeners == null)
+                _individualFriendListeners = new Dictionary<string, FirestoreChangeListener>();
+
             // ✅ Tạo bản sao để tránh lỗi sửa trong lúc duyệt
             var currentKeys = _individualFriendListeners.Keys.ToList();
             var obsolete = currentKeys.Except(friendIds).ToList();
