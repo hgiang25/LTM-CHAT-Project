@@ -1,0 +1,16 @@
+﻿<Application x:Class="UI_Chat_App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:UI_Chat_App"
+             xmlns:converters="clr-namespace:UI_Chat_App.Converters" 
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="SharedResources.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <converters:PriorityToVisibilityConverter x:Key="PriorityToVisibilityConverter" />
+            <converters:BlockToVisibilityConverter x:Key="BlockToVisibilityConverter"/>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

@@ -1,4 +1,4 @@
-# UI Chat App
+﻿# UI Chat App
 
 ## Setup Instructions
 
@@ -19,4 +19,3 @@ Restore NuGet packages in Visual Studio.
 
 5. **Run the application:**
 Open the solution in Visual Studio and run the project.
-# LTM-CHAT-Project

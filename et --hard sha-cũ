@@ -1,0 +1,92 @@
+[33m274aa34[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mGiang[m[33m, [m[1;31morigin/Giang[m[33m, [m[1;31morigin/Duy_test[m[33m)[m HEAD@{0}: reset: moving to HEAD~2
+[33m577675a[m[33m ([m[1;31morigin/tai[m[33m)[m HEAD@{1}: checkout: moving from tai to Giang
+[33m8cb6df8[m[33m ([m[1;32mtai[m[33m)[m HEAD@{2}: checkout: moving from Giang to tai
+[33m577675a[m[33m ([m[1;31morigin/tai[m[33m)[m HEAD@{3}: pull --progress --no-edit --no-stat --recurse-submodules=no origin: Merge made by the 'ort' strategy.
+[33m1544240[m HEAD@{4}: commit: add feature status typing
+[33m274aa34[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mGiang[m[33m, [m[1;31morigin/Giang[m[33m, [m[1;31morigin/Duy_test[m[33m)[m HEAD@{5}: pull origin Duy_test: Fast-forward
+[33md69580b[m HEAD@{6}: checkout: moving from 274aa34d4f9353b6320643b0b0a3b0cb53224c8e to Giang
+[33m274aa34[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mGiang[m[33m, [m[1;31morigin/Giang[m[33m, [m[1;31morigin/Duy_test[m[33m)[m HEAD@{7}: checkout: moving from Giang to origin/Duy_test
+[33md69580b[m HEAD@{8}: reset: moving to HEAD
+[33md69580b[m HEAD@{9}: checkout: moving from Duy_test to Giang
+[33meb296a4[m[33m ([m[1;32mDuy_test[m[33m)[m HEAD@{10}: commit: update ver GK
+[33m08f0514[m HEAD@{11}: checkout: moving from Giang to Duy_test
+[33md69580b[m HEAD@{12}: reset: moving to HEAD
+[33md69580b[m HEAD@{13}: checkout: moving from Duy_test to Giang
+[33m08f0514[m HEAD@{14}: reset: moving to HEAD
+[33m08f0514[m HEAD@{15}: commit (merge): merge complete
+[33m95a8d6f[m HEAD@{16}: commit: test merge from tai
+[33md69580b[m HEAD@{17}: reset: moving to HEAD
+[33md69580b[m HEAD@{18}: checkout: moving from tai to Duy_test
+[33m8cb6df8[m[33m ([m[1;32mtai[m[33m)[m HEAD@{19}: checkout: moving from Duy_test to tai
+[33md69580b[m HEAD@{20}: reset: moving to HEAD
+[33md69580b[m HEAD@{21}: reset: moving to HEAD
+[33md69580b[m HEAD@{22}: checkout: moving from tai to Duy_test
+[33m8cb6df8[m[33m ([m[1;32mtai[m[33m)[m HEAD@{23}: pull --progress --no-edit --no-stat --recurse-submodules=no origin: Fast-forward
+[33m0386b83[m HEAD@{24}: checkout: moving from Duy_test to tai
+[33md69580b[m HEAD@{25}: checkout: moving from Tai to Duy_test
+[33m0386b83[m HEAD@{26}: checkout: moving from Duy_test to Tai
+[33md69580b[m HEAD@{27}: checkout: moving from Giang to Duy_test
+[33md69580b[m HEAD@{28}: checkout: moving from Duy_test to Giang
+[33md69580b[m HEAD@{29}: checkout: moving from Giang to Duy_test
+[33md69580b[m HEAD@{30}: checkout: moving from Duy to Giang
+[33mb93155f[m[33m ([m[1;31morigin/Duy[m[33m)[m HEAD@{31}: checkout: moving from Giang to Duy
+[33md69580b[m HEAD@{32}: checkout: moving from Duy_test to Giang
+[33md69580b[m HEAD@{33}: checkout: moving from main to Duy_test
+[33madb1afd[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m HEAD@{34}: checkout: moving from main to main
+[33madb1afd[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m HEAD@{35}: checkout: moving from Duy_test to main
+[33md69580b[m HEAD@{36}: checkout: moving from Giang_test to Duy_test
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{37}: checkout: moving from main to Giang_test
+[33madb1afd[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m HEAD@{38}: checkout: moving from Duy_test to main
+[33md69580b[m HEAD@{39}: checkout: moving from Giang to Duy_test
+[33md69580b[m HEAD@{40}: merge Duy_test: Fast-forward
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{41}: checkout: moving from Duy_test to Giang
+[33md69580b[m HEAD@{42}: commit: Update Notification for GK
+[33m67efbd9[m HEAD@{43}: checkout: moving from Giang_test to Duy_test
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{44}: checkout: moving from Duy_test to Giang_test
+[33m67efbd9[m HEAD@{45}: checkout: moving from Giang to Duy_test
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{46}: checkout: moving from Duy_test to Giang
+[33m67efbd9[m HEAD@{47}: reset: moving to HEAD
+[33m67efbd9[m HEAD@{48}: checkout: moving from Giang to Duy_test
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{49}: checkout: moving from Duy_test to Giang
+[33m67efbd9[m HEAD@{50}: reset: moving to HEAD
+[33m67efbd9[m HEAD@{51}: checkout: moving from Giang to Duy_test
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{52}: checkout: moving from Duy_test to Giang
+[33m67efbd9[m HEAD@{53}: checkout: moving from Giang_test to Duy_test
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{54}: reset: moving to HEAD
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{55}: checkout: moving from Giang to Giang_test
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{56}: reset: moving to 1aa77b4
+[33mb93155f[m[33m ([m[1;31morigin/Duy[m[33m)[m HEAD@{57}: reset: moving to b93155f
+[33m67efbd9[m HEAD@{58}: merge Duy_test: Fast-forward
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{59}: checkout: moving from Duy_test to Giang
+[33m67efbd9[m HEAD@{60}: commit (merge): Merge branch 'Giang_test' into Duy_test
+[33mb93155f[m[33m ([m[1;31morigin/Duy[m[33m)[m HEAD@{61}: checkout: moving from Duy to Duy_test
+[33mb93155f[m[33m ([m[1;31morigin/Duy[m[33m)[m HEAD@{62}: checkout: moving from Giang_test to Duy
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{63}: Branch: renamed refs/heads/test to refs/heads/Giang_test
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{65}: checkout: moving from Giang to test
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{66}: checkout: moving from Duy to Giang
+[33mb93155f[m[33m ([m[1;31morigin/Duy[m[33m)[m HEAD@{67}: reset: moving to HEAD
+[33mb93155f[m[33m ([m[1;31morigin/Duy[m[33m)[m HEAD@{68}: reset: moving to HEAD
+[33mb93155f[m[33m ([m[1;31morigin/Duy[m[33m)[m HEAD@{69}: checkout: moving from Duy to Duy
+[33mb93155f[m[33m ([m[1;31morigin/Duy[m[33m)[m HEAD@{70}: checkout: moving from test to Duy
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{71}: reset: moving to HEAD
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{72}: checkout: moving from Duy to test
+[33mb93155f[m[33m ([m[1;31morigin/Duy[m[33m)[m HEAD@{73}: checkout: moving from Giang to Duy
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{74}: checkout: moving from Duy to Giang
+[33mb93155f[m[33m ([m[1;31morigin/Duy[m[33m)[m HEAD@{75}: checkout: moving from Giang to Duy
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{76}: checkout: moving from Duy to Giang
+[33mb93155f[m[33m ([m[1;31morigin/Duy[m[33m)[m HEAD@{77}: checkout: moving from Giang to Duy
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{78}: checkout: moving from test-merge-ui to Giang
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{79}: reset: moving to HEAD
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{80}: reset: moving to HEAD
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{81}: checkout: moving from Giang to test-merge-ui
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{82}: checkout: moving from Giang to Giang
+[33m1aa77b4[m[33m ([m[1;31morigin/test[m[33m)[m HEAD@{83}: commit: Add Notification feature
+[33m0386b83[m HEAD@{84}: checkout: moving from tai to Giang
+[33m0386b83[m HEAD@{85}: checkout: moving from Giang to tai
+[33m0386b83[m HEAD@{86}: checkout: moving from tai to Giang
+[33m0386b83[m HEAD@{87}: reset: moving to HEAD
+[33m0386b83[m HEAD@{88}: checkout: moving from Giang to tai
+[33m0386b83[m HEAD@{89}: reset: moving to HEAD
+[33m0386b83[m HEAD@{90}: Branch: renamed refs/heads/tai to refs/heads/Giang
+[33m0386b83[m HEAD@{92}: checkout: moving from main to tai
+[33madb1afd[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m HEAD@{93}: clone: from https://github.com/hgiang25/LTM-CHAT-Project
