@@ -2175,7 +2175,7 @@ namespace UI_Chat_App
                     MessageBox.Show(skippedMsg, "Thành viên bị bỏ qua", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
 
-                await RefreshFriendsAndRequestsAsync();
+                //await RefreshFriendsAndRequestsAsync();
                 GroupNameTextBox.Text = "";
                 GroupUserListBox.UnselectAll();
             }
